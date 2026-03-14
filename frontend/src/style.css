@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    @apply bg-parchment-100 text-slate-900 antialiased;
+  }
+
+  body {
+    @apply min-h-screen;
+  }
+}
+
+@layer components {
+  /* Topographic contour line motif — used as a subtle repeating SVG background */
+  .topo-bg {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cpath d='M 10 100 Q 50 60 100 100 Q 150 140 190 100' fill='none' stroke='%234a7f3d' stroke-width='0.5' opacity='0.15'/%3E%3Cpath d='M 0 70 Q 40 30 90 70 Q 140 110 180 70' fill='none' stroke='%234a7f3d' stroke-width='0.5' opacity='0.12'/%3E%3Cpath d='M 20 130 Q 60 90 110 130 Q 160 170 200 130' fill='none' stroke='%234a7f3d' stroke-width='0.5' opacity='0.1'/%3E%3Cpath d='M -10 50 Q 30 10 80 50 Q 130 90 170 50' fill='none' stroke='%234a7f3d' stroke-width='0.5' opacity='0.08'/%3E%3C/svg%3E");
+    background-size: 200px 200px;
+  }
+
+  /* Coordinate grid motif — cartography feel */
+  .grid-bg {
+    background-image:
+      linear-gradient(rgba(74, 111, 165, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(74, 111, 165, 0.05) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+}
