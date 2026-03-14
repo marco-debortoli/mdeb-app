@@ -72,9 +72,9 @@ function initMDE(content: string) {
     mde.toTextArea();
     mde = null;
   }
+  textareaRef.value.value = content;
   mde = new EasyMDE({
     element: textareaRef.value,
-    initialValue: content,
     autofocus: true,
     spellChecker: false,
     status: false, // disable built-in status bar (we have our own)

@@ -21,9 +21,9 @@ function initMDE(content: string) {
     mde.toTextArea();
     mde = null;
   }
+  textareaRef.value.value = content;
   mde = new EasyMDE({
     element: textareaRef.value,
-    initialValue: content,
     autofocus: false,
     spellChecker: false,
     status: false,
