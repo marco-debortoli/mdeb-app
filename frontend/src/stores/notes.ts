@@ -88,7 +88,9 @@ export const useNotesStore = defineStore("notes", () => {
 
   async function saveNote(id: number, data: { title?: string; content?: string }): Promise<void> {
     const saved = await noteApi.update(id, data);
-    activeNote.value = saved;
+    if (activeNote.value?.id === id) {
+      activeNote.value = saved;
+    }
     const idx = noteList.value.findIndex((n) => n.id === id);
     if (idx !== -1) {
       noteList.value[idx] = { ...noteList.value[idx], ...saved };

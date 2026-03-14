@@ -16,6 +16,21 @@
   }
 }
 
+/* Shared EasyMDE heading sizes — applied via .mde-editor wrapper class (editor) and .mde-preview (rendered) */
+.mde-editor .CodeMirror .cm-header-1 { font-size: 1.4rem; }
+.mde-editor .CodeMirror .cm-header-2 { font-size: 1.2rem; }
+.mde-editor .CodeMirror .cm-header-3 { font-size: 1.05rem; }
+.mde-editor .CodeMirror .cm-header-4,
+.mde-editor .CodeMirror .cm-header-5,
+.mde-editor .CodeMirror .cm-header-6 { font-size: 0.95rem; }
+
+.mde-preview h1 { font-size: 1.4rem; }
+.mde-preview h2 { font-size: 1.2rem; }
+.mde-preview h3 { font-size: 1.05rem; }
+.mde-preview h4,
+.mde-preview h5,
+.mde-preview h6 { font-size: 0.95rem; }
+
 @layer components {
   /* Topographic contour line motif — used as a subtle repeating SVG background */
   .topo-bg {

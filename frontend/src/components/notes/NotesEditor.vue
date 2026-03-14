@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import EasyMDE from "easymde";
+import { marked } from "marked";
 import { useNotesStore } from "@/stores/notes";
 
 const emit = defineEmits<{
@@ -38,7 +39,6 @@ function initMDE(content: string) {
       "link",
       "horizontal-rule",
       "|",
-      "preview",
       "guide",
     ],
     minHeight: "300px",
@@ -59,15 +59,6 @@ function destroyMDE() {
 // ── Title ────────────────────────────────────────────────────────────────────
 
 const titleValue = ref("");
-
-watch(
-  () => store.activeNote?.title,
-  (t) => {
-    if (t !== undefined && t !== titleValue.value) {
-      titleValue.value = t;
-    }
-  },
-);
 
 function onTitleInput() {
   scheduleAutoSave();
@@ -99,21 +90,22 @@ function scheduleAutoSave() {
     } catch {
       saveStatus.value = "error";
     }
-  }, 1000);
+  }, 5000);
 }
 
-async function flushSave() {
-  if (saveTimer && store.activeNote) {
-    clearTimeout(saveTimer);
-    saveTimer = null;
-    try {
-      await store.saveNote(store.activeNote.id, {
-        title: titleValue.value || "Untitled",
-        content: mde?.value() ?? "",
-      });
-    } catch {
-      /* ignore */
-    }
+async function flushSave(noteId?: number) {
+  if (!saveTimer) return;
+  const id = noteId ?? store.activeNote?.id;
+  if (!id) return;
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  try {
+    await store.saveNote(id, {
+      title: titleValue.value || "Untitled",
+      content: mde?.value() ?? "",
+    });
+  } catch {
+    /* ignore */
   }
 }
 
@@ -125,9 +117,10 @@ watch(
     if (newId === oldId) return;
     // Flush save for old note before switching
     if (oldId !== undefined && oldId !== null) {
-      await flushSave();
+      await flushSave(oldId);
     }
     destroyMDE();
+    previewMode.value = false;
     saveStatus.value = "idle";
     if (newId !== undefined && newId !== null) {
       titleValue.value = store.activeNote?.title ?? "";
@@ -136,6 +129,29 @@ watch(
     }
   },
 );
+
+// ── Preview mode ──────────────────────────────────────────────────────────────
+
+const previewMode = ref(false);
+const previewContent = ref("");
+
+const renderedContent = computed(() => {
+  if (!previewContent.value.trim()) return "";
+  return marked(previewContent.value) as string;
+});
+
+async function togglePreview() {
+  if (!previewMode.value) {
+    previewContent.value = mde?.value() ?? store.activeNote?.content ?? "";
+    await flushSave();
+    destroyMDE();
+    previewMode.value = true;
+  } else {
+    previewMode.value = false;
+    await nextTick();
+    initMDE(previewContent.value);
+  }
+}
 
 // ── Delete ────────────────────────────────────────────────────────────────────
 
@@ -211,6 +227,27 @@ onBeforeUnmount(() => {
           <template v-else-if="saveStatus === 'error'">Save failed</template>
         </span>
 
+        <!-- Preview toggle -->
+        <button
+          :title="previewMode ? 'Switch to edit mode' : 'Switch to preview mode'"
+          class="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors shrink-0"
+          :class="
+            previewMode
+              ? 'border-forest-300 bg-forest-50 text-forest-700 hover:bg-forest-100'
+              : 'border-parchment-300 bg-parchment-50 text-slate-600 hover:bg-parchment-100'
+          "
+          @click="togglePreview"
+        >
+          <svg v-if="previewMode" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
+          </svg>
+          <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          {{ previewMode ? "Edit" : "Preview" }}
+        </button>
+
         <!-- Delete button -->
         <button
           class="p-1.5 rounded-lg transition-colors shrink-0"
@@ -233,8 +270,14 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- EasyMDE -->
-      <div class="note-editor flex-1 min-h-0">
+      <div v-show="!previewMode" class="note-editor mde-editor flex-1 min-h-0">
         <textarea ref="textareaRef" />
+      </div>
+
+      <!-- Preview -->
+      <div v-if="previewMode" class="flex-1 overflow-y-auto bg-parchment-50 border border-parchment-300 rounded-xl px-8 py-6">
+        <div v-if="renderedContent" class="prose prose-slate max-w-none mde-preview" v-html="renderedContent" />
+        <p v-else class="text-slate-400 text-sm italic">Nothing to preview.</p>
       </div>
     </template>
   </div>

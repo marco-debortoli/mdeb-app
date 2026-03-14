@@ -341,13 +341,13 @@ function toggleExpand(id: number) {
 
       <template v-else>
         <!-- Write mode: EasyMDE editor -->
-        <div :class="['journal-editor', { hidden: !writeMode }]">
+        <div :class="['journal-editor', 'mde-editor', { hidden: !writeMode }]">
           <textarea ref="textareaRef" />
         </div>
 
         <!-- Read mode: rendered markdown -->
         <div v-if="!writeMode" class="bg-parchment-50 border border-parchment-300 rounded-xl px-8 py-6 min-h-64">
-          <div v-if="renderedContent" class="prose prose-slate max-w-none" v-html="renderedContent" />
+          <div v-if="renderedContent" class="prose prose-slate max-w-none mde-preview" v-html="renderedContent" />
           <p v-else class="text-slate-400 text-sm italic">No entry for this day yet.</p>
         </div>
       </template>
@@ -395,7 +395,7 @@ function toggleExpand(id: number) {
           <!-- Full rendered markdown (expanded) -->
           <div
             v-else
-            class="px-4 pb-4 prose prose-sm prose-slate max-w-none border-t border-parchment-200 pt-3"
+            class="px-4 pb-4 prose prose-sm prose-slate max-w-none mde-preview border-t border-parchment-200 pt-3"
             v-html="marked(past.content) as string"
           />
         </div>

@@ -15,6 +15,7 @@ services:
     restart: unless-stopped
 
   backend:
+    image: ghcr.io/marco-debortoli/mdeb-app-backend:latest
     build:
       context: ./backend
       target: prod
@@ -25,6 +26,7 @@ services:
     restart: unless-stopped
 
   frontend:
+    image: ghcr.io/marco-debortoli/mdeb-app-frontend:latest
     build:
       context: ./frontend
       target: prod

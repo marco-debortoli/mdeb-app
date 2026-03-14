@@ -64,7 +64,7 @@ export interface TransactionUpdate {
   amount?: string;
   account_id?: number;
   category_id?: number;
-  merchant_id?: number;
+  merchant_id?: number | null;
   to_account_id?: number | null;
 }
 
