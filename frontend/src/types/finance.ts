@@ -38,11 +38,12 @@ export interface Transaction {
   id: number;
   date: string;
   amount: string;
-  account_id: number;
+  account_id: number | null;
   category_id: number;
   merchant_id: number | null;
   to_account_id: number | null;
-  account: FinanceAccount;
+  account: FinanceAccount | null;
+  description: string | null;
   category: FinanceCategory;
   merchant: Merchant | null;
   to_account: FinanceAccount | null;

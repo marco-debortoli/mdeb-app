@@ -44,10 +44,10 @@ const emit = defineEmits<{
                 </div>
                 <div class="text-xs font-mono text-slate-400">
                   {{ formatDate(txn.date, props.currentMonth) }}
-                  <span class="ml-1 text-slate-300"
-                    >· {{ txn.account.name
-                    }}<template v-if="txn.to_account"> → {{ txn.to_account.name }}</template></span
-                  >
+                  <span class="ml-1 text-slate-300">·
+                    <template v-if="!txn.account">External<template v-if="txn.to_account"> → {{ txn.to_account.name }}</template></template>
+                    <template v-else>{{ txn.account.name }}<template v-if="txn.to_account"> → {{ txn.to_account.name }}</template></template>
+                  </span>
                 </div>
               </div>
               <span
@@ -98,8 +98,14 @@ const emit = defineEmits<{
                   <CategoryBadge :type="txn.category.type" :name="txn.category.name" />
                 </td>
                 <td class="px-4 py-3 text-slate-600 text-xs">
-                  {{ txn.account.name }}
-                  <span v-if="txn.to_account" class="text-slate-400"> → {{ txn.to_account.name }}</span>
+                  <template v-if="!txn.account">
+                    <span class="text-slate-400 italic">External</span>
+                    <span v-if="txn.to_account" class="text-slate-400"> → {{ txn.to_account.name }}</span>
+                  </template>
+                  <template v-else>
+                    {{ txn.account.name }}
+                    <span v-if="txn.to_account" class="text-slate-400"> → {{ txn.to_account.name }}</span>
+                  </template>
                 </td>
                 <td
                   class="px-4 py-3 text-right font-mono font-medium"

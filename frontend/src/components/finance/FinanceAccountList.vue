@@ -66,32 +66,34 @@ async function saveValue(accId: number) {
           </div>
           <div class="flex items-center gap-1 shrink-0 mt-0.5">
             <!-- Reconciliation indicator -->
-            <svg
-              v-if="item.reconciled"
-              class="w-4 h-4 text-forest-500"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.75"
-              viewBox="0 0 24 24"
-              title="Reconciled"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <svg
-              v-else
-              class="w-4 h-4 text-slate-300"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.75"
-              viewBox="0 0 24 24"
-              title="Not reconciled"
-            >
-              <circle cx="12" cy="12" r="9" />
-            </svg>
+            <template v-if="item.account.type !== 'investment'">
+              <svg
+                v-if="item.reconciled"
+                class="w-4 h-4 text-forest-500"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                viewBox="0 0 24 24"
+                title="Reconciled"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <svg
+                v-else
+                class="w-4 h-4 text-slate-300"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                viewBox="0 0 24 24"
+                title="Not reconciled"
+              >
+                <circle cx="12" cy="12" r="9" />
+              </svg>
+            </template>
             <!-- Edit account -->
             <button
               class="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-parchment-200 transition-colors"
