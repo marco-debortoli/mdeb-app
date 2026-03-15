@@ -92,6 +92,12 @@ export const useFinanceStore = defineStore("finance", () => {
     await fetchSummary();
   }
 
+  async function goToMonth(year: number, month: number) {
+    currentYear.value = year;
+    currentMonth.value = month;
+    await fetchSummary();
+  }
+
   // ── Account actions ────────────────────────────────────────────────────────
 
   async function createAccount(data: Omit<FinanceAccount, "id" | "created_at">) {
@@ -179,6 +185,7 @@ export const useFinanceStore = defineStore("finance", () => {
     fetchSummary,
     prevMonth,
     nextMonth,
+    goToMonth,
     createAccount,
     updateAccount,
     deleteAccount,

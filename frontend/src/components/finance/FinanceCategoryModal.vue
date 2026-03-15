@@ -159,9 +159,9 @@ async function addCategory() {
                           class="text-xs font-medium"
                           :class="
                             cat.type === 'credit'
-                              ? 'text-forest-600'
+                              ? 'text-earth-600'
                               : cat.type === 'debit'
-                                ? 'text-earth-600'
+                                ? 'text-forest-600'
                                 : 'text-slate-500'
                           "
                           >{{ TYPE_LABELS[cat.type] }}</span

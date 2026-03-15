@@ -54,9 +54,9 @@ const emit = defineEmits<{
                 class="font-mono font-semibold text-sm shrink-0"
                 :class="
                   txn.category.type === 'credit'
-                    ? 'text-forest-700'
+                    ? 'text-earth-700'
                     : txn.category.type === 'debit'
-                      ? 'text-earth-700'
+                      ? 'text-forest-700'
                       : 'text-slate-600'
                 "
               >
@@ -111,9 +111,9 @@ const emit = defineEmits<{
                   class="px-4 py-3 text-right font-mono font-medium"
                   :class="
                     txn.category.type === 'credit'
-                      ? 'text-forest-700'
+                      ? 'text-earth-700'
                       : txn.category.type === 'debit'
-                        ? 'text-earth-700'
+                        ? 'text-forest-700'
                         : 'text-slate-600'
                   "
                 >

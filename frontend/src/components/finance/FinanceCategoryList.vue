@@ -8,14 +8,14 @@ defineProps<{
 }>();
 
 const expanded = ref<Record<string, boolean>>({
-  credit: true,
-  debit: true,
+  credit: false,
+  debit: false,
   transfer: false,
 });
 
 const groups = [
-  { type: "credit" as const, label: "Credit" },
   { type: "debit" as const, label: "Debit" },
+  { type: "credit" as const, label: "Credit" },
   { type: "transfer" as const, label: "Transfer" },
 ];
 </script>
@@ -36,7 +36,7 @@ const groups = [
           <span
             class="text-xs font-semibold uppercase tracking-widest"
             :class="
-              group.type === 'credit' ? 'text-forest-600' : group.type === 'debit' ? 'text-earth-600' : 'text-slate-500'
+              group.type === 'credit' ? 'text-earth-600' : group.type === 'debit' ? 'text-forest-600' : 'text-slate-500'
             "
           >
             {{ group.label }}
