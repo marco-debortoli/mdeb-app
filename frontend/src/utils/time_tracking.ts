@@ -92,6 +92,37 @@ export function generateEndOptions(baseDate: string): TimeOption[] {
   return options;
 }
 
+// ── Overnight entry clipping ──────────────────────────────────────────────────
+
+/**
+ * Returns how many minutes of an entry fall within a given calendar date.
+ * For regular (single-day) entries this equals duration_minutes.
+ * For overnight entries, only the portion within [date T00:00, date T24:00) is counted.
+ */
+export function clippedMinutesForDate(entry: { start_time: string; end_time: string; duration_minutes: number }, date: string): number {
+  const startDate = entry.start_time.split("T")[0];
+  const endDate = entry.end_time.split("T")[0];
+
+  // Entirely within the day
+  if (startDate === date && endDate === date) return entry.duration_minutes;
+
+  const toMins = (iso: string) => {
+    const [, t] = iso.split("T");
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m;
+  };
+
+  if (startDate === date) {
+    // Starts today, ends tomorrow → count from start to midnight
+    return 24 * 60 - toMins(entry.start_time);
+  }
+  if (endDate === date) {
+    // Started yesterday, ends today → count from midnight to end
+    return toMins(entry.end_time);
+  }
+  return 0;
+}
+
 // ── Month string helpers ──────────────────────────────────────────────────────
 
 export function currentMonthISO(): string {

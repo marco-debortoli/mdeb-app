@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useTimeStore } from "@/stores/time_tracking";
-import { formatTime, formatDuration } from "@/utils/time_tracking";
+import { formatTime, formatDuration, clippedMinutesForDate } from "@/utils/time_tracking";
+import { useDayEntries } from "@/composables/useDayEntries";
 import type { TimeEntry } from "@/types/time_tracking";
 import TimeEntryModal from "@/components/time/TimeEntryModal.vue";
 
@@ -12,8 +13,9 @@ const showModal = ref(false);
 const modalMode = ref<"create" | "edit">("create");
 const editingEntry = ref<TimeEntry | null>(null);
 
+const todayData = useDayEntries(today);
 const todayEntries = computed(
-  () => store.days.find((d) => d.date === today) ?? { date: today, entries: [], total_minutes: 0, has_overlap: false },
+  () => todayData.value ?? { date: today, entries: [], total_minutes: 0, has_overlap: false },
 );
 
 function openCreate() {
@@ -83,7 +85,7 @@ onMounted(() => store.fetchAll());
             </div>
             <div class="text-xs font-mono text-slate-400">
               {{ formatTime(entry.start_time) }} – {{ formatTime(entry.end_time) }} ·
-              {{ formatDuration(entry.duration_minutes) }}
+              {{ formatDuration(clippedMinutesForDate(entry, today)) }}
             </div>
             <p v-if="entry.notes" class="text-xs text-slate-400 mt-0.5 truncate">{{ entry.notes }}</p>
           </div>
@@ -125,7 +127,7 @@ onMounted(() => store.fetchAll());
                   {{ formatTime(entry.start_time) }} – {{ formatTime(entry.end_time) }}
                 </td>
                 <td class="px-4 py-2.5 text-xs font-mono text-slate-600">
-                  {{ formatDuration(entry.duration_minutes) }}
+                  {{ formatDuration(clippedMinutesForDate(entry, today)) }}
                 </td>
                 <td class="px-4 py-2.5">
                   <button

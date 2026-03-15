@@ -2,7 +2,8 @@
 import { ref, computed, onMounted } from "vue";
 import { useTimeStore } from "@/stores/time_tracking";
 import type { TimeEntry } from "@/types/time_tracking";
-import { formatMonthLabel, formatDuration, formatDayHeader } from "@/utils/time_tracking";
+import { formatMonthLabel, formatDuration, formatDayHeader, clippedMinutesForDate } from "@/utils/time_tracking";
+import { useDayEntries } from "@/composables/useDayEntries";
 import TimeEntryTable from "@/components/time/TimeEntryTable.vue";
 import TimeEntryModal from "@/components/time/TimeEntryModal.vue";
 import TimeCategoryModal from "@/components/time/TimeCategoryModal.vue";
@@ -55,7 +56,7 @@ function nextDay() {
   navigateTo(shiftDate(currentDate.value, 1));
 }
 
-const currentDayData = computed(() => store.days.find((d) => d.date === currentDate.value));
+const currentDayData = useDayEntries(currentDate);
 
 const dailySummary = computed(() => {
   if (!currentDayData.value) return [];
@@ -70,7 +71,7 @@ const dailySummary = computed(() => {
         total_minutes: 0,
       });
     }
-    map.get(key)!.total_minutes += entry.duration_minutes;
+    map.get(key)!.total_minutes += clippedMinutesForDate(entry, currentDate.value);
   }
   return [...map.values()];
 });
