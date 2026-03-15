@@ -10,24 +10,16 @@ import FinanceTransactionModal from "@/components/finance/FinanceTransactionModa
 import FinanceAccountModal from "@/components/finance/FinanceAccountModal.vue";
 import FinanceCategoryModal from "@/components/finance/FinanceCategoryModal.vue";
 import FinanceMerchantModal from "@/components/finance/FinanceMerchantModal.vue";
+import FinanceMonthPicker from "@/components/finance/FinanceMonthPicker.vue";
 
 const store = useFinanceStore();
 
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-const monthLabel = computed(() => `${MONTH_NAMES[store.currentMonth - 1]} ${store.currentYear}`);
+const monthLabel = computed(() => {
+  const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  return `${MONTH_NAMES[store.currentMonth - 1]} ${store.currentYear}`;
+});
+
+onMounted(() => store.fetchAll());
 
 // ── Transaction modal ─────────────────────────────────────────────────────────
 const txnModalOpen = ref(false);
@@ -69,7 +61,6 @@ const catModalOpen = ref(false);
 // ── Merchant modal ────────────────────────────────────────────────────────────
 const merchantModalOpen = ref(false);
 
-onMounted(() => store.fetchAll());
 </script>
 
 <template>
@@ -86,9 +77,11 @@ onMounted(() => store.fetchAll());
             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
           </svg>
         </button>
-        <span class="text-lg font-semibold text-slate-800 min-w-[150px] text-center font-mono tracking-wide">
-          {{ monthLabel }}
-        </span>
+        <FinanceMonthPicker
+          :current-year="store.currentYear"
+          :current-month="store.currentMonth"
+          @select="(y, m) => store.goToMonth(y, m)"
+        />
         <button
           class="p-1.5 rounded-lg text-slate-500 hover:bg-parchment-200 hover:text-slate-700 transition-colors"
           title="Next month"

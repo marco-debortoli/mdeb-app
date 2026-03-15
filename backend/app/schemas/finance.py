@@ -121,11 +121,12 @@ class TransactionRead(BaseModel):
     id: int
     date: Date
     amount: Decimal
-    account_id: int
+    description: str | None
+    account_id: int | None
     category_id: int
     merchant_id: int | None
     to_account_id: int | None
-    account: AccountRead
+    account: AccountRead | None
     category: FinanceCategoryRead
     merchant: MerchantRead | None
     to_account: AccountRead | None

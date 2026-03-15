@@ -99,8 +99,9 @@ class Transaction(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     date: Mapped[Date] = mapped_column(Date, nullable=False, index=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
-    account_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("finance_accounts.id", ondelete="RESTRICT"), nullable=False
+    description: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    account_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("finance_accounts.id", ondelete="RESTRICT"), nullable=True
     )
     category_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("finance_categories.id", ondelete="RESTRICT"), nullable=False

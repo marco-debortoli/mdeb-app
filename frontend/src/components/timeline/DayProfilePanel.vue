@@ -47,11 +47,25 @@ const renderedJournal = computed(() => {
 function formatAmount(amount: string, type: string): string {
   const n = parseFloat(amount);
   const formatted = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return type === "credit" ? `+$${formatted}` : `-$${formatted}`;
+  switch(type) {
+    case "credit":
+      return `-$${formatted}`;
+    case "transfer":
+      return `$${formatted}`;
+    default:
+      return `+$${formatted}`
+  }
 }
 
 function amountClass(type: string): string {
-  return type === "credit" ? "text-forest-600 font-medium" : "text-red-600 font-medium";
+  switch(type) {
+    case "debit":
+      return "text-forest-600 font-medium";
+    case "credit":
+      return "text-red-600 font-medium";
+    default:
+      return "font-medium"
+  }
 }
 </script>
 
@@ -135,7 +149,8 @@ function amountClass(type: string): string {
                     {{ tx.merchant?.name ?? tx.category.name }}
                   </p>
                   <p class="text-xs text-parchment-500 truncate">
-                    {{ tx.account.name }}
+                    <template v-if="tx.account">{{ tx.account.name }}</template>
+                    <span v-else class="italic">External</span>
                     <span v-if="tx.to_account"> → {{ tx.to_account.name }}</span>
                     · {{ tx.category.name }}
                   </p>

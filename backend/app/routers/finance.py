@@ -329,16 +329,17 @@ async def monthly_summary(
     # For transfers: source account loses money (-), destination account gains money (+).
     account_deltas: dict[int, Decimal] = {}
     for txn in transactions:
-        account_deltas.setdefault(txn.account_id, Decimal("0"))
-        if txn.category.type == FinanceCategoryType.DEBIT:
-            account_deltas[txn.account_id] += txn.amount
-        elif txn.category.type == FinanceCategoryType.CREDIT:
-            account_deltas[txn.account_id] -= txn.amount
-        else:  # TRANSFER
-            account_deltas[txn.account_id] -= txn.amount
-            if txn.to_account_id is not None:
-                account_deltas.setdefault(txn.to_account_id, Decimal("0"))
-                account_deltas[txn.to_account_id] += txn.amount
+        if txn.account_id is not None:
+            account_deltas.setdefault(txn.account_id, Decimal("0"))
+            if txn.category.type == FinanceCategoryType.DEBIT:
+                account_deltas[txn.account_id] += txn.amount
+            elif txn.category.type == FinanceCategoryType.CREDIT:
+                account_deltas[txn.account_id] -= txn.amount
+            else:  # TRANSFER
+                account_deltas[txn.account_id] -= txn.amount
+        if txn.category.type == FinanceCategoryType.TRANSFER and txn.to_account_id is not None:
+            account_deltas.setdefault(txn.to_account_id, Decimal("0"))
+            account_deltas[txn.to_account_id] += txn.amount
 
     # Fetch all account values for this month
     av_result = await db.execute(
@@ -353,14 +354,19 @@ async def monthly_summary(
     )
     prev_account_values: dict[int, AccountValue] = {av.account_id: av for av in prev_av_result.scalars().all()}
 
-    # Determine which accounts to show: non-archived + archived with transactions or an account value
-    active_account_ids = set(account_deltas.keys()) | set(account_values.keys())
+    # Determine which accounts to show: active during this month.
+    # Condition: start_date < first day of month AND (end_date is None OR end_date >= first day of month)
+    from datetime import date as date_type
+    month_start = date_type(year, month, 1)
+
     acc_result = await db.execute(select(FinanceAccount).order_by(FinanceAccount.name))
     all_accounts = acc_result.scalars().all()
 
     account_summaries: list[AccountMonthlySummary] = []
     for acc in all_accounts:
-        if acc.archived and acc.id not in active_account_ids:
+        if acc.start_date > month_start:
+            continue
+        if acc.end_date is not None and acc.end_date < month_start:
             continue
         delta = account_deltas.get(acc.id, Decimal("0"))
         av = account_values.get(acc.id)
@@ -392,12 +398,16 @@ async def monthly_summary(
         entry = CategoryMonthlySummary(category=cat, total=total)
         categories_by_type[cat.type.value].append(entry)
 
-    # Monthly profit = sum(debit) - sum(credit), profit_eligible accounts only, no transfers
+    # Monthly profit = sum(debit) - sum(credit), profit_eligible accounts only.
+    # External transfers (account=None, to_account set) count as income to to_account if profit_eligible.
     monthly_profit = Decimal("0")
     for txn in transactions:
         if txn.category.type == FinanceCategoryType.TRANSFER:
+            # External transfer in: account is None, money arrives at to_account
+            if txn.account is None and txn.to_account is not None and txn.to_account.profit_eligible:
+                monthly_profit += txn.amount
             continue
-        if not txn.account.profit_eligible:
+        if txn.account is None or not txn.account.profit_eligible:
             continue
         if txn.category.type == FinanceCategoryType.DEBIT:
             monthly_profit += txn.amount
