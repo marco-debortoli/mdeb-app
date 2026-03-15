@@ -21,7 +21,7 @@ const store = useFinanceStore();
 const form = ref({
   date: "",
   amount: "",
-  account_id: "" as number | "",
+  account_id: null as number | null,
   category_id: "" as number | "",
   merchant_id: null as number | null,
   to_account_id: null as number | null,
@@ -90,7 +90,7 @@ watch(
       form.value = {
         date: defaultDate(),
         amount: "",
-        account_id: "",
+        account_id: null,
         category_id: "",
         merchant_id: null,
         to_account_id: null,
@@ -101,7 +101,7 @@ watch(
         date: t.date,
         amount: t.amount,
         account_id: t.account_id,
-        category_id: t.category_id,
+        category_id: t.category_id ?? "",
         merchant_id: t.merchant_id,
         to_account_id: t.to_account_id,
       };
@@ -110,7 +110,7 @@ watch(
 );
 
 async function save() {
-  if (!form.value.date || !form.value.amount || form.value.account_id === "" || form.value.category_id === "") {
+  if (!form.value.date || !form.value.amount || form.value.category_id === "") {
     error.value = "Please fill in all required fields.";
     return;
   }
@@ -120,7 +120,7 @@ async function save() {
     const payload = {
       date: form.value.date,
       amount: form.value.amount,
-      account_id: form.value.account_id as number,
+      account_id: form.value.account_id,
       category_id: form.value.category_id as number,
       merchant_id: form.value.merchant_id,
       to_account_id: isTransfer.value ? form.value.to_account_id : null,
@@ -192,7 +192,7 @@ async function remove() {
         v-model="form.account_id"
         class="w-full text-sm rounded-lg border border-parchment-300 bg-white px-3 py-2 text-slate-800 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none"
       >
-        <option value="">— select —</option>
+        <option :value="null">— none —</option>
         <option v-for="acc in store.accounts.filter((a: FinanceAccount) => !a.archived)" :key="acc.id" :value="acc.id">
           {{ acc.name }}
         </option>

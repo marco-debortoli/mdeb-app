@@ -19,7 +19,7 @@ const props = withDefaults(
     placeholder?: string;
     pageSize?: number;
   }>(),
-  { options: () => [], groups: () => [], placeholder: "— select —", pageSize: 15 },
+  { options: () => [], placeholder: "— select —", pageSize: 15 },
 );
 
 const emit = defineEmits<{

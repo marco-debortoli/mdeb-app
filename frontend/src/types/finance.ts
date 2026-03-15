@@ -54,7 +54,7 @@ export interface Transaction {
 export interface TransactionCreate {
   date: string;
   amount: string;
-  account_id: number;
+  account_id?: number | null;
   category_id: number;
   merchant_id?: number | null;
   to_account_id?: number | null;
@@ -63,7 +63,7 @@ export interface TransactionCreate {
 export interface TransactionUpdate {
   date?: string;
   amount?: string;
-  account_id?: number;
+  account_id?: number | null;
   category_id?: number;
   merchant_id?: number | null;
   to_account_id?: number | null;

@@ -102,7 +102,7 @@ class MerchantRead(BaseModel):
 class TransactionCreate(BaseModel):
     date: Date
     amount: Decimal = Field(..., decimal_places=2)
-    account_id: int
+    account_id: int | None = None
     category_id: int
     merchant_id: int | None = None
     to_account_id: int | None = None
