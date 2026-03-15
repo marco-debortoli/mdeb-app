@@ -45,7 +45,7 @@ onMounted(() => store.fetchSummary());
     <div v-else-if="!store.summary" class="flex-1 flex items-center justify-center text-sm text-slate-400 italic">
       No data for this month.
     </div>
-    <div v-else class="flex-1 flex flex-col justify-center px-5 py-5 gap-5">
+    <div v-else class="flex-1 flex flex-col px-5 py-5 gap-5">
       <div class="flex items-center justify-between">
         <span class="text-sm text-slate-500">Monthly Profit</span>
         <span class="text-2xl font-semibold font-mono" :class="profitIsPositive ? 'text-forest-600' : 'text-red-600'">{{
