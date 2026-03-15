@@ -1,9 +1,9 @@
 import calendar
-from datetime import date as date_type
+from datetime import date as date_type, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import and_, extract, select
+from sqlalchemy import Date, and_, cast, extract, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -139,14 +139,23 @@ async def get_day_profile(entry_date: date_type, db: AsyncSession = Depends(get_
     )
     completed_tasks = list(result.scalars().all())
 
-    # Time entries
+    # Time entries — includes overnight entries from the previous day that end on entry_date
+    prev_date = entry_date - timedelta(days=1)
     result = await db.execute(
         select(TimeEntry)
         .options(
             selectinload(TimeEntry.category).selectinload(TimeCategory.subcategories),
             selectinload(TimeEntry.subcategory),
         )
-        .where(TimeEntry.date == entry_date)
+        .where(
+            or_(
+                TimeEntry.date == entry_date,
+                and_(
+                    TimeEntry.date == prev_date,
+                    cast(TimeEntry.end_time, Date) == entry_date,
+                ),
+            )
+        )
         .order_by(TimeEntry.start_time)
     )
     time_entries = [TimeEntryRead.from_orm_with_duration(e) for e in result.scalars().all()]

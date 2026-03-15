@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import { marked } from "marked";
 import type { DayProfile } from "@/types/timeline";
-import { formatDuration, formatTime, isNextDay } from "@/utils/time_tracking";
+import { formatDuration, formatTime, isNextDay, clippedMinutesForDate } from "@/utils/time_tracking";
 
 const props = defineProps<{
   date: string;
@@ -217,7 +217,7 @@ function amountClass(type: string): string {
               <span class="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0"></span>
               <h3 class="text-sm font-semibold text-blue-800 uppercase tracking-wider">Time Entries</h3>
               <span v-if="profile.time_entries.length" class="ml-auto text-xs text-parchment-500">
-                {{ formatDuration(profile.time_entries.reduce((s, e) => s + e.duration_minutes, 0)) }} total
+                {{ formatDuration(profile.time_entries.reduce((s, e) => s + clippedMinutesForDate(e, date), 0)) }} total
               </span>
             </div>
             <div v-if="profile.time_entries.length">
@@ -239,7 +239,7 @@ function amountClass(type: string): string {
                     {{ formatTime(entry.start_time) }} – {{ formatTime(entry.end_time) }}
                     <span v-if="isNextDay(entry.start_time, entry.end_time)" class="text-parchment-400">+1d</span>
                   </p>
-                  <p class="text-xs font-medium text-slate-700">{{ formatDuration(entry.duration_minutes) }}</p>
+                  <p class="text-xs font-medium text-slate-700">{{ formatDuration(clippedMinutesForDate(entry, date)) }}</p>
                 </div>
               </div>
             </div>
