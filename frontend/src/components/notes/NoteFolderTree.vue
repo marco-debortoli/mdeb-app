@@ -9,6 +9,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  select: [id: number];
   rename: [folder: NoteFolder];
   delete: [folder: NoteFolder];
   addChild: [folder: NoteFolder];
@@ -39,7 +40,7 @@ const depth = props.depth ?? 0;
             : 'text-parchment-300 hover:bg-forest-700 hover:text-parchment-100'
         "
         :style="{ paddingLeft: `${depth * 12 + 8}px` }"
-        @click="store.selectFolder(folder.id)"
+        @click="emit('select', folder.id)"
       >
         <!-- Expand/collapse toggle -->
         <button v-if="folder.children.length > 0" class="p-0.5 shrink-0" @click.stop="toggleExpand(folder.id)">
@@ -126,6 +127,7 @@ const depth = props.depth ?? 0;
         v-if="expanded.has(folder.id) && folder.children.length > 0"
         :folders="folder.children"
         :depth="depth + 1"
+        @select="emit('select', $event)"
         @rename="emit('rename', $event)"
         @delete="emit('delete', $event)"
         @add-child="emit('addChild', $event)"

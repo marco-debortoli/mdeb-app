@@ -90,7 +90,7 @@ function scheduleAutoSave() {
     } catch {
       saveStatus.value = "error";
     }
-  }, 5000);
+  }, 2500);
 }
 
 async function flushSave(noteId?: number) {

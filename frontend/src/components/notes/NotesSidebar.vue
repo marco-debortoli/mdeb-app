@@ -139,6 +139,7 @@ async function handleNewNote() {
       <div class="px-1 pb-2 max-h-48 md:max-h-none overflow-y-auto">
         <NoteFolderTree
           :folders="store.folderTree"
+          @select="selectFolderAndShowNotes"
           @rename="openRenameFolder"
           @delete="openDeleteFolder"
           @add-child="openCreateFolder"
