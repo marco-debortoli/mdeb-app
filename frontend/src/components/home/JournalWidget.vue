@@ -3,7 +3,8 @@ import { ref, computed, nextTick, onBeforeUnmount, onMounted } from "vue";
 import EasyMDE from "easymde";
 import { useJournalStore } from "@/stores/journal";
 
-const today = new Date().toISOString().slice(0, 10);
+const d = new Date();
+const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 const store = useJournalStore();
 const textareaRef = ref<HTMLTextAreaElement | null>(null);

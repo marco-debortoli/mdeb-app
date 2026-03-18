@@ -7,7 +7,8 @@ import { TaskStatus, Priority } from "@/types/tasks";
 import TaskRow from "@/components/tasks/TaskRow.vue";
 import TaskModal from "@/components/tasks/TaskModal.vue";
 
-const today = new Date().toISOString().slice(0, 10);
+const d = new Date();
+const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 const tasksStore = useTasksStore();
 const widgetTasks = ref<TaskSummary[]>([]);
