@@ -2,7 +2,6 @@
 import { ref, computed, watch } from "vue";
 import { useTimeStore } from "@/stores/time_tracking";
 import type { TimeEntry } from "@/types/time_tracking";
-import { generateStartOptions, generateEndOptions } from "@/utils/time_tracking";
 
 const props = defineProps<{
   open: boolean;
@@ -23,10 +22,13 @@ const form = ref({
   date: "",
   time_category_id: 0,
   time_subcategory_id: null as number | null,
-  start_time: "",
-  end_time: "",
   notes: "",
 });
+
+const startH = ref<number | "">("");
+const startM = ref<number>(0);
+const endH = ref<number | "">("");
+const endM = ref<number>(0);
 
 const saving = ref(false);
 const error = ref<string | null>(null);
@@ -48,40 +50,95 @@ watch(
   },
 );
 
-// ── Time options ────────────────────────────────────────────────────────────
+// ── Time helpers ────────────────────────────────────────────────────────────
 
-const startOptions = computed(() => (form.value.date ? generateStartOptions(form.value.date) : []));
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const MINUTES = [0, 15, 30, 45];
 
-const endOptions = computed(() => (form.value.date ? generateEndOptions(form.value.date) : []));
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function formatHour(h: number): string {
+  return pad2(h);
+}
+
+// ── Computed ISO strings ─────────────────────────────────────────────────────
+
+/** End is on the next calendar day when its H:M is strictly before start's H:M */
+const isOvernight = computed(() => {
+  if (startH.value === "" || endH.value === "") return false;
+  return (endH.value as number) * 60 + endM.value < (startH.value as number) * 60 + startM.value;
+});
+
+const endDate = computed(() => {
+  if (!form.value.date || !isOvernight.value) return form.value.date;
+  const [y, mo, d] = form.value.date.split("-").map(Number);
+  const dt = new Date(y, mo - 1, d + 1);
+  return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+});
+
+const startTimeISO = computed((): string => {
+  if (startH.value === "" || !form.value.date) return "";
+  return `${form.value.date}T${pad2(startH.value as number)}:${pad2(startM.value)}:00`;
+});
+
+const endTimeISO = computed((): string => {
+  if (endH.value === "" || !endDate.value) return "";
+  return `${endDate.value}T${pad2(endH.value as number)}:${pad2(endM.value)}:00`;
+});
 
 // ── Validation ──────────────────────────────────────────────────────────────
 
 const timeError = computed(() => {
-  if (!form.value.start_time || !form.value.end_time) return null;
-  if (form.value.end_time <= form.value.start_time) {
+  if (!startTimeISO.value || !endTimeISO.value) return null;
+  if (endTimeISO.value <= startTimeISO.value) {
     return "End time must be after start time";
   }
-  const durationMs = new Date(form.value.end_time).getTime() - new Date(form.value.start_time).getTime();
+  const durationMs = new Date(endTimeISO.value).getTime() - new Date(startTimeISO.value).getTime();
   if (durationMs > 86_400_000) {
     return "Duration cannot exceed 24 hours";
   }
   return null;
 });
 
+// ── Pre-fill helpers ─────────────────────────────────────────────────────────
+
+function lastEndTimeForDate(date: string): { h: number; m: number } | null {
+  const day = store.days.find((d) => d.date === date);
+  if (!day || !day.entries.length) return null;
+  const sorted = [...day.entries].sort((a, b) => a.end_time.localeCompare(b.end_time));
+  const last = sorted[sorted.length - 1];
+  const [, timePart] = last.end_time.split("T");
+  const [hStr, mStr] = timePart.split(":");
+  const h = parseInt(hStr, 10) % 24;
+  const rawM = parseInt(mStr, 10);
+  // Snap to nearest 15-min slot
+  const m = MINUTES.includes(rawM) ? rawM : Math.min(45, Math.round(rawM / 15) * 15);
+  return { h, m };
+}
+
+function applyStartPrefill(date: string) {
+  const last = lastEndTimeForDate(date);
+  if (last) {
+    startH.value = last.h;
+    startM.value = last.m;
+  } else {
+    startH.value = "";
+    startM.value = 0;
+  }
+  endH.value = "";
+  endM.value = 0;
+}
+
 // ── Reset / populate form ────────────────────────────────────────────────────
 
 function resetForm(date?: string) {
   const d = date ?? store.currentMonth + "-01";
-  form.value = {
-    date: d,
-    time_category_id: 0,
-    time_subcategory_id: null,
-    start_time: "",
-    end_time: "",
-    notes: "",
-  };
+  form.value = { date: d, time_category_id: 0, time_subcategory_id: null, notes: "" };
   error.value = null;
   overlapWarning.value = false;
+  applyStartPrefill(d);
 }
 
 function populateFromEntry(entry: TimeEntry) {
@@ -89,13 +146,31 @@ function populateFromEntry(entry: TimeEntry) {
     date: entry.date,
     time_category_id: entry.time_category_id,
     time_subcategory_id: entry.time_subcategory_id,
-    start_time: entry.start_time.slice(0, 19), // strip timezone
-    end_time: entry.end_time.slice(0, 19),
     notes: entry.notes ?? "",
   };
   error.value = null;
   overlapWarning.value = false;
+
+  const [, startT] = entry.start_time.split("T");
+  const [sh, sm] = startT.split(":").map(Number);
+  startH.value = sh;
+  startM.value = sm;
+
+  const [, endT] = entry.end_time.split("T");
+  const [eh, em] = endT.split(":").map(Number);
+  endH.value = eh;
+  endM.value = em;
 }
+
+// Re-apply prefill when date changes in create mode
+watch(
+  () => form.value.date,
+  (newDate) => {
+    if (props.mode === "create" && newDate) {
+      applyStartPrefill(newDate);
+    }
+  },
+);
 
 watch(
   () => props.open,
@@ -113,7 +188,7 @@ watch(
 // ── Save ────────────────────────────────────────────────────────────────────
 
 async function save() {
-  if (!form.value.date || !form.value.start_time || !form.value.end_time) {
+  if (!form.value.date || startH.value === "" || endH.value === "") {
     error.value = "Date, start time, and end time are required";
     return;
   }
@@ -133,8 +208,8 @@ async function save() {
   try {
     const payload = {
       date: form.value.date,
-      start_time: form.value.start_time,
-      end_time: form.value.end_time,
+      start_time: startTimeISO.value,
+      end_time: endTimeISO.value,
       time_category_id: form.value.time_category_id,
       time_subcategory_id: form.value.time_subcategory_id,
       notes: form.value.notes.trim() || null,
@@ -149,7 +224,6 @@ async function save() {
 
     if (res.has_overlap) {
       overlapWarning.value = true;
-      // Still close the modal — the warning was just informational
     }
 
     emit("close");
@@ -254,31 +328,51 @@ async function deleteEntry() {
 
             <!-- Start / End time -->
             <div class="grid grid-cols-2 gap-3">
+              <!-- Start -->
               <div>
                 <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Start</label>
-                <select
-                  v-model="form.start_time"
-                  :disabled="!form.date"
-                  class="w-full text-sm rounded-lg border border-parchment-300 bg-white px-3 py-2 text-slate-800 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none disabled:opacity-50"
-                >
-                  <option value="" disabled>Time…</option>
-                  <option v-for="opt in startOptions" :key="opt.value" :value="opt.value">
-                    {{ opt.label }}
-                  </option>
-                </select>
+                <div class="flex gap-1">
+                  <select
+                    v-model="startH"
+                    :disabled="!form.date"
+                    class="flex-1 min-w-0 text-sm rounded-lg border border-parchment-300 bg-white px-2 py-2 text-slate-800 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none disabled:opacity-50"
+                  >
+                    <option value="" disabled>Hr</option>
+                    <option v-for="h in HOURS" :key="h" :value="h">{{ formatHour(h) }}</option>
+                  </select>
+                  <select
+                    v-model="startM"
+                    :disabled="!form.date || startH === ''"
+                    class="w-16 text-sm rounded-lg border border-parchment-300 bg-white px-2 py-2 text-slate-800 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none disabled:opacity-50"
+                  >
+                    <option v-for="m in MINUTES" :key="m" :value="m">:{{ pad2(m) }}</option>
+                  </select>
+                </div>
               </div>
+
+              <!-- End -->
               <div>
-                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">End</label>
-                <select
-                  v-model="form.end_time"
-                  :disabled="!form.date"
-                  class="w-full text-sm rounded-lg border border-parchment-300 bg-white px-3 py-2 text-slate-800 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none disabled:opacity-50"
-                >
-                  <option value="" disabled>Time…</option>
-                  <option v-for="opt in endOptions" :key="opt.value" :value="opt.value">
-                    {{ opt.label }}
-                  </option>
-                </select>
+                <label class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">
+                  End
+                  <span v-if="isOvernight" class="text-[10px] font-medium normal-case tracking-normal text-slate-400 bg-slate-100 px-1 rounded">+1 day</span>
+                </label>
+                <div class="flex gap-1">
+                  <select
+                    v-model="endH"
+                    :disabled="!form.date"
+                    class="flex-1 min-w-0 text-sm rounded-lg border border-parchment-300 bg-white px-2 py-2 text-slate-800 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none disabled:opacity-50"
+                  >
+                    <option value="" disabled>Hr</option>
+                    <option v-for="h in HOURS" :key="h" :value="h">{{ formatHour(h) }}</option>
+                  </select>
+                  <select
+                    v-model="endM"
+                    :disabled="!form.date || endH === ''"
+                    class="w-16 text-sm rounded-lg border border-parchment-300 bg-white px-2 py-2 text-slate-800 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none disabled:opacity-50"
+                  >
+                    <option v-for="m in MINUTES" :key="m" :value="m">:{{ pad2(m) }}</option>
+                  </select>
+                </div>
               </div>
             </div>
             <p v-if="timeError" class="text-xs text-red-500">{{ timeError }}</p>
