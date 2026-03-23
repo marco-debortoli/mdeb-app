@@ -165,6 +165,61 @@ const weeklyGrandTotal = computed(() =>
   weekDaysData.value.reduce((sum, { data }) => sum + (data?.total_minutes ?? 0), 0),
 );
 
+// ── Detailed summary (category → subcategory breakdown) ───────────────────────
+
+const showDetailedSummary = ref(false);
+
+interface SubcatRow { id: number | null; name: string; total_minutes: number; }
+interface DetailedCatRow {
+  category_id: number;
+  category_name: string;
+  color: string;
+  total_minutes: number;
+  subcategories: SubcatRow[]; // empty if category has no named subcategories
+}
+
+function buildDetailedSummary(pairs: { entry: TimeEntry; date: string }[]): DetailedCatRow[] {
+  const catMap = new Map<number, DetailedCatRow>();
+  for (const { entry, date } of pairs) {
+    const catId = entry.category.id;
+    if (!catMap.has(catId)) {
+      catMap.set(catId, { category_id: catId, category_name: entry.category.name, color: entry.category.color, total_minutes: 0, subcategories: [] });
+    }
+    const cat = catMap.get(catId)!;
+    const mins = clippedMinutesForDate(entry, date);
+    cat.total_minutes += mins;
+    const subcatId = entry.subcategory?.id ?? null;
+    let sub = cat.subcategories.find((s) => s.id === subcatId);
+    if (!sub) {
+      sub = { id: subcatId, name: entry.subcategory?.name ?? "Unspecified", total_minutes: 0 };
+      cat.subcategories.push(sub);
+    }
+    sub.total_minutes += mins;
+  }
+  // Drop subcategory rows for categories that have no named (non-null) subcategories
+  for (const cat of catMap.values()) {
+    if (!cat.subcategories.some((s) => s.id !== null)) cat.subcategories = [];
+  }
+  return [...catMap.values()];
+}
+
+const detailedDailySummary = computed((): DetailedCatRow[] => {
+  if (!currentDayData.value) return [];
+  return buildDetailedSummary(currentDayData.value.entries.map((entry) => ({ entry, date: currentDate.value })));
+});
+
+const detailedWeeklySummary = computed((): DetailedCatRow[] =>
+  buildDetailedSummary(
+    weekDaysData.value.flatMap(({ date, data }) => (data?.entries ?? []).map((entry) => ({ entry, date }))),
+  ),
+);
+
+const detailedMonthlySummary = computed((): DetailedCatRow[] =>
+  buildDetailedSummary(
+    store.days.flatMap((day) => day.entries.map((entry) => ({ entry, date: day.date }))),
+  ),
+);
+
 async function navigateTo(date: string) {
   currentDate.value = date;
   showDatePicker.value = false;
@@ -402,23 +457,39 @@ onMounted(() => store.fetchAll());
 
         <!-- Day summary sidebar -->
         <aside class="bg-parchment-50 border border-parchment-300 rounded-xl overflow-hidden">
-          <div class="px-4 py-3 border-b border-parchment-200">
+          <div class="px-4 py-3 border-b border-parchment-200 flex items-center justify-between">
             <h3 class="text-xs font-semibold uppercase tracking-widest text-slate-400">Day Summary</h3>
+            <button
+              :title="showDetailedSummary ? 'Show overview' : 'Show subcategory breakdown'"
+              class="text-slate-400 hover:text-slate-600 transition-colors"
+              @click="showDetailedSummary = !showDetailedSummary"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path v-if="!showDetailedSummary" stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M9 12h12M9 18h12M6 9v9" />
+                <path v-else stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M3 12h18M3 18h18" />
+              </svg>
+            </button>
           </div>
           <div v-if="dailySummary.length" class="divide-y divide-parchment-200">
-            <div
-              v-for="cat in dailySummary"
-              :key="cat.category_id"
-              class="flex items-center justify-between px-4 py-2.5"
-            >
-              <div class="flex items-center gap-2 min-w-0">
-                <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ backgroundColor: cat.color }" />
-                <span class="text-sm text-slate-700 truncate">{{ cat.category_name }}</span>
+            <template v-for="cat in detailedDailySummary" :key="cat.category_id">
+              <div class="flex items-center justify-between px-4 py-2.5">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ backgroundColor: cat.color }" />
+                  <span class="text-sm text-slate-700 truncate">{{ cat.category_name }}</span>
+                </div>
+                <span class="text-sm font-mono text-slate-600 shrink-0 ml-2">{{ formatDuration(cat.total_minutes) }}</span>
               </div>
-              <span class="text-sm font-mono text-slate-600 shrink-0 ml-2">{{
-                formatDuration(cat.total_minutes)
-              }}</span>
-            </div>
+              <template v-if="showDetailedSummary && cat.subcategories.length">
+                <div
+                  v-for="sub in cat.subcategories"
+                  :key="sub.id ?? 'unspecified'"
+                  class="flex items-center justify-between pl-8 pr-4 py-1.5 bg-parchment-100/60"
+                >
+                  <span class="text-xs text-slate-500 truncate">{{ sub.name }}</span>
+                  <span class="text-xs font-mono text-slate-500 shrink-0 ml-2">{{ formatDuration(sub.total_minutes) }}</span>
+                </div>
+              </template>
+            </template>
             <div class="flex items-center justify-between px-4 py-2.5 bg-parchment-100">
               <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Total</span>
               <span class="text-sm font-mono font-semibold text-slate-700">{{ formatDuration(dailyGrandTotal) }}</span>
@@ -451,21 +522,39 @@ onMounted(() => store.fetchAll());
 
         <!-- Weekly category totals -->
         <aside class="bg-parchment-50 border border-parchment-300 rounded-xl overflow-hidden">
-          <div class="px-4 py-3 border-b border-parchment-200">
+          <div class="px-4 py-3 border-b border-parchment-200 flex items-center justify-between">
             <h3 class="text-xs font-semibold uppercase tracking-widest text-slate-400">Week Summary</h3>
+            <button
+              :title="showDetailedSummary ? 'Show overview' : 'Show subcategory breakdown'"
+              class="text-slate-400 hover:text-slate-600 transition-colors"
+              @click="showDetailedSummary = !showDetailedSummary"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path v-if="!showDetailedSummary" stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M9 12h12M9 18h12M6 9v9" />
+                <path v-else stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M3 12h18M3 18h18" />
+              </svg>
+            </button>
           </div>
           <div v-if="weeklySummary.length" class="divide-y divide-parchment-200">
-            <div
-              v-for="cat in weeklySummary"
-              :key="cat.category_id"
-              class="flex items-center justify-between px-4 py-2.5"
-            >
-              <div class="flex items-center gap-2 min-w-0">
-                <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ backgroundColor: cat.color }" />
-                <span class="text-sm text-slate-700 truncate">{{ cat.category_name }}</span>
+            <template v-for="cat in detailedWeeklySummary" :key="cat.category_id">
+              <div class="flex items-center justify-between px-4 py-2.5">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ backgroundColor: cat.color }" />
+                  <span class="text-sm text-slate-700 truncate">{{ cat.category_name }}</span>
+                </div>
+                <span class="text-sm font-mono text-slate-600 shrink-0 ml-2">{{ formatDuration(cat.total_minutes) }}</span>
               </div>
-              <span class="text-sm font-mono text-slate-600 shrink-0 ml-2">{{ formatDuration(cat.total_minutes) }}</span>
-            </div>
+              <template v-if="showDetailedSummary && cat.subcategories.length">
+                <div
+                  v-for="sub in cat.subcategories"
+                  :key="sub.id ?? 'unspecified'"
+                  class="flex items-center justify-between pl-8 pr-4 py-1.5 bg-parchment-100/60"
+                >
+                  <span class="text-xs text-slate-500 truncate">{{ sub.name }}</span>
+                  <span class="text-xs font-mono text-slate-500 shrink-0 ml-2">{{ formatDuration(sub.total_minutes) }}</span>
+                </div>
+              </template>
+            </template>
             <div class="flex items-center justify-between px-4 py-2.5 bg-parchment-100">
               <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Total</span>
               <span class="text-sm font-mono font-semibold text-slate-700">{{ formatDuration(weeklyGrandTotal) }}</span>
@@ -490,28 +579,42 @@ onMounted(() => store.fetchAll());
 
         <!-- Monthly category totals -->
         <aside class="bg-parchment-50 border border-parchment-300 rounded-xl overflow-hidden">
-          <div class="px-4 py-3 border-b border-parchment-200">
+          <div class="px-4 py-3 border-b border-parchment-200 flex items-center justify-between">
             <h3 class="text-xs font-semibold uppercase tracking-widest text-slate-400">Categories</h3>
+            <button
+              :title="showDetailedSummary ? 'Show overview' : 'Show subcategory breakdown'"
+              class="text-slate-400 hover:text-slate-600 transition-colors"
+              @click="showDetailedSummary = !showDetailedSummary"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path v-if="!showDetailedSummary" stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M9 12h12M9 18h12M6 9v9" />
+                <path v-else stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M3 12h18M3 18h18" />
+              </svg>
+            </button>
           </div>
           <div v-if="store.summary.length" class="divide-y divide-parchment-200">
-            <div
-              v-for="cat in store.summary"
-              :key="cat.category_id"
-              class="flex items-center justify-between px-4 py-2.5"
-            >
-              <div class="flex items-center gap-2 min-w-0">
-                <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ backgroundColor: cat.color }" />
-                <span class="text-sm text-slate-700 truncate">{{ cat.category_name }}</span>
+            <template v-for="cat in detailedMonthlySummary" :key="cat.category_id">
+              <div class="flex items-center justify-between px-4 py-2.5">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ backgroundColor: cat.color }" />
+                  <span class="text-sm text-slate-700 truncate">{{ cat.category_name }}</span>
+                </div>
+                <span class="text-sm font-mono text-slate-600 shrink-0 ml-2">{{ formatDuration(cat.total_minutes) }}</span>
               </div>
-              <span class="text-sm font-mono text-slate-600 shrink-0 ml-2">{{
-                formatDuration(cat.total_minutes)
-              }}</span>
-            </div>
+              <template v-if="showDetailedSummary && cat.subcategories.length">
+                <div
+                  v-for="sub in cat.subcategories"
+                  :key="sub.id ?? 'unspecified'"
+                  class="flex items-center justify-between pl-8 pr-4 py-1.5 bg-parchment-100/60"
+                >
+                  <span class="text-xs text-slate-500 truncate">{{ sub.name }}</span>
+                  <span class="text-xs font-mono text-slate-500 shrink-0 ml-2">{{ formatDuration(sub.total_minutes) }}</span>
+                </div>
+              </template>
+            </template>
             <div class="flex items-center justify-between px-4 py-2.5 bg-parchment-100">
               <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Total</span>
-              <span class="text-sm font-mono font-semibold text-slate-700">{{
-                formatDuration(store.grandTotalMinutes)
-              }}</span>
+              <span class="text-sm font-mono font-semibold text-slate-700">{{ formatDuration(store.grandTotalMinutes) }}</span>
             </div>
           </div>
           <div v-else class="px-4 py-6 text-sm text-slate-400 text-center italic">No entries this month.</div>
