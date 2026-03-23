@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { useTimeStore } from "@/stores/time_tracking";
-import type { TimeEntry } from "@/types/time_tracking";
+import type { TimeEntry, DayEntries } from "@/types/time_tracking";
 import { formatMonthLabel, formatDuration, formatDayHeader, clippedMinutesForDate } from "@/utils/time_tracking";
+import { timeEntryApi } from "@/api/time_tracking";
 import { useDayEntries } from "@/composables/useDayEntries";
 import TimeEntryTable from "@/components/time/TimeEntryTable.vue";
 import TimeEntryModal from "@/components/time/TimeEntryModal.vue";
@@ -13,7 +14,7 @@ const store = useTimeStore();
 
 // ── View mode ─────────────────────────────────────────────────────────────────
 
-const viewMode = ref<"day" | "month">("day");
+const viewMode = ref<"day" | "week" | "month">("day");
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -38,6 +39,131 @@ function shiftDate(iso: string, days: number): string {
 const currentDate = ref<string>(todayISO());
 const showDatePicker = ref(false);
 const isToday = computed(() => currentDate.value === todayISO());
+
+// ── Week view state ───────────────────────────────────────────────────────────
+
+function getWeekMonday(dateISO: string): string {
+  const [y, m, d] = dateISO.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  const dow = dt.getDay(); // 0 = Sun
+  dt.setDate(dt.getDate() + (dow === 0 ? -6 : 1 - dow));
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+}
+
+const currentWeekMonday = ref<string>(getWeekMonday(todayISO()));
+const weekExtraDays = ref<DayEntries[]>([]);
+const weekLoading = ref(false);
+
+const weekDates = computed((): string[] =>
+  Array.from({ length: 7 }, (_, i) => shiftDate(currentWeekMonday.value, i)),
+);
+
+const isThisWeek = computed(() => currentWeekMonday.value === getWeekMonday(todayISO()));
+
+function formatWeekLabel(monday: string): string {
+  const sunday = shiftDate(monday, 6);
+  const [my, mm, md] = monday.split("-").map(Number);
+  const [sy, sm, sd] = sunday.split("-").map(Number);
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  if (my === sy && mm === sm) return `${MONTHS[mm - 1]} ${md}–${sd}, ${my}`;
+  if (my === sy) return `${MONTHS[mm - 1]} ${md} – ${MONTHS[sm - 1]} ${sd}, ${my}`;
+  return `${MONTHS[mm - 1]} ${md}, ${my} – ${MONTHS[sm - 1]} ${sd}, ${sy}`;
+}
+
+async function loadWeekExtraDays(monday: string) {
+  const sunday = shiftDate(monday, 6);
+  const monMonth = monday.slice(0, 7);
+  const sunMonth = sunday.slice(0, 7);
+  if (monMonth !== sunMonth) {
+    const res = await timeEntryApi.list(sunMonth);
+    weekExtraDays.value = res.days;
+  } else {
+    weekExtraDays.value = [];
+  }
+}
+
+async function navigateToWeek(monday: string) {
+  currentWeekMonday.value = monday;
+  const primaryMonth = monday.slice(0, 7);
+  weekLoading.value = true;
+  try {
+    if (primaryMonth !== store.currentMonth) {
+      store.currentMonth = primaryMonth;
+      await store.fetchAll();
+    }
+    await loadWeekExtraDays(monday);
+  } finally {
+    weekLoading.value = false;
+  }
+}
+
+function prevWeek() {
+  navigateToWeek(shiftDate(currentWeekMonday.value, -7));
+}
+function nextWeek() {
+  navigateToWeek(shiftDate(currentWeekMonday.value, 7));
+}
+
+// When switching to week view, sync to the week containing the current day view date
+watch(viewMode, async (newMode) => {
+  if (newMode === "week") {
+    const monday = getWeekMonday(currentDate.value);
+    currentWeekMonday.value = monday;
+    const primaryMonth = monday.slice(0, 7);
+    if (primaryMonth !== store.currentMonth) {
+      store.currentMonth = primaryMonth;
+      await store.fetchAll();
+    }
+    await loadWeekExtraDays(monday);
+  }
+});
+
+function getWeekDayEntries(date: string): DayEntries | undefined {
+  const allDays = [...store.days, ...weekExtraDays.value];
+  const prevDate = shiftDate(date, -1);
+  const dayData = allDays.find((day) => day.date === date);
+  const prevDayData = allDays.find((day) => day.date === prevDate);
+  const overnight = (prevDayData?.entries ?? []).filter((e) => e.end_time.split("T")[0] === date);
+  if (!overnight.length) {
+    if (!dayData) return undefined;
+    return {
+      ...dayData,
+      total_minutes: dayData.entries.reduce((sum, e) => sum + clippedMinutesForDate(e, date), 0),
+    };
+  }
+  const entries = [...overnight, ...(dayData?.entries ?? [])].sort((a, b) =>
+    a.start_time.localeCompare(b.start_time),
+  );
+  return {
+    date,
+    entries,
+    total_minutes: entries.reduce((sum, e) => sum + clippedMinutesForDate(e, date), 0),
+    has_overlap: dayData?.has_overlap ?? false,
+  };
+}
+
+const weekDaysData = computed(() =>
+  weekDates.value.map((date) => ({ date, data: getWeekDayEntries(date) })),
+);
+
+const weeklySummary = computed(() => {
+  const map = new Map<number, { category_id: number; category_name: string; color: string; total_minutes: number }>();
+  for (const { date, data } of weekDaysData.value) {
+    if (!data) continue;
+    for (const entry of data.entries) {
+      const key = entry.category.id;
+      if (!map.has(key)) {
+        map.set(key, { category_id: key, category_name: entry.category.name, color: entry.category.color, total_minutes: 0 });
+      }
+      map.get(key)!.total_minutes += clippedMinutesForDate(entry, date);
+    }
+  }
+  return [...map.values()];
+});
+
+const weeklyGrandTotal = computed(() =>
+  weekDaysData.value.reduce((sum, { data }) => sum + (data?.total_minutes ?? 0), 0),
+);
 
 async function navigateTo(date: string) {
   currentDate.value = date;
@@ -155,6 +281,32 @@ onMounted(() => store.fetchAll());
           </button>
         </template>
 
+        <!-- Week view: week navigation -->
+        <template v-else-if="viewMode === 'week'">
+          <button
+            class="p-1.5 rounded-lg text-slate-500 hover:bg-parchment-200 hover:text-slate-700 transition-colors"
+            title="Previous week"
+            @click="prevWeek"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+            </svg>
+          </button>
+          <span class="text-lg font-semibold text-slate-800 min-w-[200px] text-center font-mono tracking-wide">
+            {{ formatWeekLabel(currentWeekMonday) }}
+          </span>
+          <button
+            :disabled="isThisWeek"
+            class="p-1.5 rounded-lg text-slate-500 hover:bg-parchment-200 hover:text-slate-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Next week"
+            @click="nextWeek"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+            </svg>
+          </button>
+        </template>
+
         <!-- Month view: month navigation -->
         <template v-else>
           <button
@@ -193,6 +345,16 @@ onMounted(() => store.fetchAll());
             @click="viewMode = 'day'"
           >
             Day
+          </button>
+          <button
+            :class="
+              viewMode === 'week'
+                ? 'bg-forest-600 text-white px-3 py-1.5'
+                : 'bg-parchment-50 text-slate-500 hover:bg-parchment-100 px-3 py-1.5 transition-colors'
+            "
+            @click="viewMode = 'week'"
+          >
+            Week
           </button>
           <button
             :class="
@@ -263,6 +425,53 @@ onMounted(() => store.fetchAll());
             </div>
           </div>
           <div v-else class="px-4 py-6 text-sm text-slate-400 text-center italic">No entries this day.</div>
+        </aside>
+      </div>
+
+      <!-- ── Week View ──────────────────────────────────────────────────────── -->
+      <div v-else-if="viewMode === 'week'" class="grid gap-4 items-start grid-cols-1 md:grid-cols-[1fr_240px]">
+        <!-- Day blocks Mon–Sun -->
+        <div class="space-y-3">
+          <div v-if="weekLoading" class="text-sm text-slate-400 py-8 text-center">Loading…</div>
+          <template v-else>
+            <template v-for="{ date, data } in weekDaysData" :key="date">
+              <TimeEntryTable v-if="data" :day="data" @create="openCreateEntry" @edit="openEditEntry" />
+              <div v-else class="bg-parchment-50 border border-parchment-300 rounded-xl px-4 py-5 flex items-center justify-between">
+                <span class="text-sm text-slate-400 italic">{{ formatDayHeader(date) }} — no entries</span>
+                <button
+                  class="text-xs font-medium text-forest-600 hover:text-forest-700 transition-colors"
+                  @click="openCreateEntry(date)"
+                >
+                  + Add
+                </button>
+              </div>
+            </template>
+          </template>
+        </div>
+
+        <!-- Weekly category totals -->
+        <aside class="bg-parchment-50 border border-parchment-300 rounded-xl overflow-hidden">
+          <div class="px-4 py-3 border-b border-parchment-200">
+            <h3 class="text-xs font-semibold uppercase tracking-widest text-slate-400">Week Summary</h3>
+          </div>
+          <div v-if="weeklySummary.length" class="divide-y divide-parchment-200">
+            <div
+              v-for="cat in weeklySummary"
+              :key="cat.category_id"
+              class="flex items-center justify-between px-4 py-2.5"
+            >
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ backgroundColor: cat.color }" />
+                <span class="text-sm text-slate-700 truncate">{{ cat.category_name }}</span>
+              </div>
+              <span class="text-sm font-mono text-slate-600 shrink-0 ml-2">{{ formatDuration(cat.total_minutes) }}</span>
+            </div>
+            <div class="flex items-center justify-between px-4 py-2.5 bg-parchment-100">
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Total</span>
+              <span class="text-sm font-mono font-semibold text-slate-700">{{ formatDuration(weeklyGrandTotal) }}</span>
+            </div>
+          </div>
+          <div v-else class="px-4 py-6 text-sm text-slate-400 text-center italic">No entries this week.</div>
         </aside>
       </div>
 
