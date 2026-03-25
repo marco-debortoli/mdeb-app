@@ -62,6 +62,6 @@ async def sync_garmin(body: SyncRequest, db: AsyncSession = Depends(get_db)):
     start = body.start_date or today
     end = body.end_date or today
 
-    service = GarminSyncService(settings.garmin_email, settings.garmin_password)
+    service = GarminSyncService(settings.garmin_email, settings.garmin_password, settings.garmin_tokenstore)
     sync_result = await service.sync(db, start, end)
     return SyncResponse(upserted=sync_result.upserted, dates=sync_result.dates)

@@ -1,9 +1,12 @@
+import logging
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 from garminconnect import Garmin
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+log = logging.getLogger(__name__)
 
 # Garmin fields managed by sync (never overwrites energy_rating / weight_kg)
 _GARMIN_FIELDS = [
@@ -25,13 +28,32 @@ class SyncResult:
 
 
 class GarminSyncService:
-    def __init__(self, email: str, password: str) -> None:
+    def __init__(self, email: str, password: str, tokenstore: str = "") -> None:
         self._email = email
         self._password = password
+        self._tokenstore = tokenstore
 
     def _get_client(self) -> Garmin:
         client = Garmin(self._email, self._password)
+
+        if self._tokenstore:
+            try:
+                client.login(tokenstore=self._tokenstore)
+                log.info("Garmin: logged in via saved tokens")
+                return client
+            except Exception as exc:
+                log.info("Garmin: token login failed (%s), falling back to credentials", exc)
+
         client.login()
+        log.info("Garmin: logged in via credentials")
+
+        if self._tokenstore:
+            try:
+                client.garth.dump(self._tokenstore)
+                log.info("Garmin: tokens saved to %s", self._tokenstore)
+            except Exception as exc:
+                log.warning("Garmin: could not save tokens: %s", exc)
+
         return client
 
     async def sync(
