@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+
+type RangeLabel = "30d" | "90d" | "6m" | "1y";
+
+const props = defineProps<{ selectedRange: RangeLabel }>();
 import {
   Chart,
   CategoryScale,
@@ -56,19 +60,10 @@ function formatDateLabel(iso: string): string {
 
 // ── Range config ───────────────────────────────────────────────────────────────
 
-const RANGES = [
-  { label: "30d", days: 30 },
-  { label: "90d", days: 90 },
-  { label: "6m", days: 180 },
-  { label: "1y", days: 365 },
-] as const;
-
-type RangeLabel = (typeof RANGES)[number]["label"];
-
-const selectedRange = ref<RangeLabel>("30d");
+const RANGE_DAYS: Record<RangeLabel, number> = { "30d": 30, "90d": 90, "6m": 180, "1y": 365 };
 
 function getRangeDays(label: RangeLabel): number {
-  return RANGES.find((r) => r.label === label)!.days;
+  return RANGE_DAYS[label];
 }
 
 function getDateRange(label: RangeLabel): { start: string; end: string } {
@@ -126,7 +121,7 @@ const SLEEP_COLORS: Record<number, string> = {
 };
 
 function buildChartArrays() {
-  const { start, end } = getDateRange(selectedRange.value);
+  const { start, end } = getDateRange(props.selectedRange);
   const allDates = buildDateList(start, end);
   const byDate = new Map<string, HealthLog>(store.logs.map((l) => [l.date, l]));
 
@@ -292,12 +287,11 @@ function initCharts() {
   }
 }
 
-// ── Range change ───────────────────────────────────────────────────────────────
-
-async function changeRange(label: RangeLabel) {
-  selectedRange.value = label;
-  await loadRange(label);
-}
+watch(
+  () => props.selectedRange,
+  async (label) => { await loadRange(label); },
+  { immediate: true },
+);
 
 watch(
   () => store.logs,
@@ -307,49 +301,13 @@ watch(
   },
 );
 
-onMounted(async () => {
-  await loadRange(selectedRange.value);
-});
-
 onBeforeUnmount(() => {
   destroyCharts();
 });
 </script>
 
 <template>
-  <div class="max-w-3xl mx-auto">
-    <!-- ── Header ──────────────────────────────────────────────────────────── -->
-    <div class="flex items-center gap-3 mb-6">
-      <RouterLink
-        to="/health"
-        class="p-1.5 rounded-lg text-slate-400 hover:bg-parchment-200 hover:text-slate-700 transition-colors"
-        title="Back to daily view"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-        </svg>
-      </RouterLink>
-
-      <h1 class="text-xl font-semibold text-slate-800 flex-1">Health Overview</h1>
-
-      <!-- Range buttons -->
-      <div class="flex gap-1">
-        <button
-          v-for="r in RANGES"
-          :key="r.label"
-          class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
-          :class="
-            selectedRange === r.label
-              ? 'bg-forest-700 text-parchment-50'
-              : 'bg-parchment-100 text-slate-600 hover:bg-parchment-200'
-          "
-          @click="changeRange(r.label)"
-        >
-          {{ r.label }}
-        </button>
-      </div>
-    </div>
-
+  <div>
     <!-- Loading / error -->
     <div v-if="store.loading" class="text-sm text-slate-400 py-16 text-center">Loading…</div>
     <div v-else-if="store.error" class="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3 mb-4">

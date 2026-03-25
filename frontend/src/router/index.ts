@@ -16,7 +16,6 @@ const router = createRouter({
     { path: "/timeline", name: "timeline", component: () => import("@/views/TimelineView.vue") },
     { path: "/notes", name: "notes", component: () => import("@/views/NotesView.vue") },
     { path: "/health", name: "health", component: () => import("@/views/HealthView.vue") },
-    { path: "/health/overview", name: "health-overview", component: () => import("@/views/HealthOverviewView.vue") },
   ],
 });
 
