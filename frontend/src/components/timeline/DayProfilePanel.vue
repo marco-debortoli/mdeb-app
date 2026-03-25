@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { marked } from "marked";
 import type { DayProfile } from "@/types/timeline";
 import { formatDuration, formatTime, isNextDay, clippedMinutesForDate } from "@/utils/time_tracking";
+import { MONTH_NAMES, DAY_NAMES } from "@/utils/date";
 
 const props = defineProps<{
   date: string;
@@ -15,23 +16,6 @@ const emit = defineEmits<{
 }>();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
-const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 const formattedDate = computed(() => {
   const [y, m, d] = props.date.split("-").map(Number);

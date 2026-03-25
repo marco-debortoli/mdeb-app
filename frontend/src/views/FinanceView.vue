@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from "vue";
 import { useFinanceStore } from "@/stores/finance";
 import type { FinanceAccount, Transaction } from "@/types/finance";
 import { formatAmount } from "@/utils/finance";
+import { MONTH_NAMES } from "@/utils/date";
 import FinanceTransactionTable from "@/components/finance/FinanceTransactionTable.vue";
 import FinanceAccountList from "@/components/finance/FinanceAccountList.vue";
 import FinanceCategoryList from "@/components/finance/FinanceCategoryList.vue";
@@ -14,10 +15,7 @@ import FinanceMonthPicker from "@/components/finance/FinanceMonthPicker.vue";
 
 const store = useFinanceStore();
 
-const monthLabel = computed(() => {
-  const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-  return `${MONTH_NAMES[store.currentMonth - 1]} ${store.currentYear}`;
-});
+const monthLabel = computed(() => `${MONTH_NAMES[store.currentMonth - 1]} ${store.currentYear}`);
 
 onMounted(() => store.fetchAll());
 

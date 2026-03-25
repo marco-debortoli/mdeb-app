@@ -13,21 +13,9 @@ const emit = defineEmits<{
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
+import { MONTH_NAMES } from "@/utils/date";
+
 const DAY_NAMES = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

@@ -136,27 +136,12 @@ export function shiftMonth(monthISO: string, delta: number): string {
   return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}`;
 }
 
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
+import { MONTH_NAMES, DAY_NAMES } from "@/utils/date";
 
 export function formatMonthLabel(monthISO: string): string {
   const [y, m] = monthISO.split("-").map(Number);
   return `${MONTH_NAMES[m - 1]} ${y}`;
 }
-
-const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export function formatDayHeader(dateISO: string): string {
   const [y, m, d] = dateISO.split("-").map(Number);
