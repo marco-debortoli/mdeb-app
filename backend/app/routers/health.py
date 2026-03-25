@@ -46,10 +46,8 @@ async def upsert_log(
     if log is None:
         log = HealthLog(date=log_date)
         db.add(log)
-    if body.energy_rating is not None:
-        log.energy_rating = body.energy_rating
-    if body.weight_kg is not None:
-        log.weight_kg = body.weight_kg
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(log, field, value)
     await db.commit()
     await db.refresh(log)
     return log
@@ -62,6 +60,6 @@ async def sync_garmin(body: SyncRequest, db: AsyncSession = Depends(get_db)):
     start = body.start_date or today
     end = body.end_date or today
 
-    service = GarminSyncService(settings.garmin_email, settings.garmin_password, settings.garmin_tokenstore)
+    service = GarminSyncService(settings.garmin_email, settings.garmin_password)
     sync_result = await service.sync(db, start, end)
     return SyncResponse(upserted=sync_result.upserted, dates=sync_result.dates)

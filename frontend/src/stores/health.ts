@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { healthApi } from "@/api/health";
-import type { HealthLog, SyncResponse } from "@/types/health";
+import type { HealthLog, HealthLogUpsert, SyncResponse } from "@/types/health";
 
 export const useHealthStore = defineStore("health", () => {
   const log = ref<HealthLog | null>(null);
@@ -37,8 +37,8 @@ export const useHealthStore = defineStore("health", () => {
     }
   }
 
-  async function saveManual(date: string, energy_rating: number | null, weight_kg: number | null) {
-    const result = await healthApi.upsertLog(date, { energy_rating, weight_kg });
+  async function saveManual(date: string, body: HealthLogUpsert) {
+    const result = await healthApi.upsertLog(date, body);
     log.value = result;
     return result;
   }

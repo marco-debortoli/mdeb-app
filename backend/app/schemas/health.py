@@ -43,6 +43,14 @@ class HealthLogRead(BaseModel):
 class HealthLogUpsert(BaseModel):
     energy_rating: int | None = None
     weight_kg: float | None = None
+    steps: int | None = None
+    sleep_score: int | None = None
+    garmin_body_battery_low: int | None = None
+    garmin_body_battery_high: int | None = None
+    resting_hr: int | None = None
+    intensity_minutes_moderate: int | None = None
+    intensity_minutes_vigorous: int | None = None
+    stress_score: int | None = None
 
 
 class SyncRequest(BaseModel):
