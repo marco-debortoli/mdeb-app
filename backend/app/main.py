@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import categories, day_ratings, finance, journal, notes, projects, tasks, time_tracking, timeline
+from app.routers import categories, day_ratings, finance, health, journal, notes, projects, tasks, time_tracking, timeline
 
 app = FastAPI(
     title="MDEB Personal App",
@@ -19,8 +19,8 @@ app.add_middleware(
 )
 
 
-@app.get("/api/health")
-async def health() -> dict:
+@app.get("/api/healthcheck")
+async def healthcheck() -> dict:
     return {"status": "ok"}
 
 
@@ -33,3 +33,4 @@ app.include_router(finance.router, prefix="/api/finance", tags=["finance"])
 app.include_router(time_tracking.router, prefix="/api/time", tags=["time"])
 app.include_router(timeline.router, prefix="/api/timeline", tags=["timeline"])
 app.include_router(notes.router, prefix="/api/notes", tags=["notes"])
+app.include_router(health.router, prefix="/api/health", tags=["health"])
