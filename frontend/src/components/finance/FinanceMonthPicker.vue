@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from "vue";
+import { MONTH_NAMES } from "@/utils/date";
 
 const props = defineProps<{
   currentYear: number;
@@ -9,11 +10,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   select: [year: number, month: number];
 }>();
-
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
 
 const monthLabel = () => `${MONTH_NAMES[props.currentMonth - 1]} ${props.currentYear}`;
 

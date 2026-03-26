@@ -3,27 +3,13 @@ import { computed, onMounted } from "vue";
 import { useTimelineStore } from "@/stores/timeline";
 import DayProfilePanel from "@/components/timeline/DayProfilePanel.vue";
 import type { DaySignals } from "@/types/timeline";
+import { MONTH_NAMES } from "@/utils/date";
 
 const store = useTimelineStore();
 
 onMounted(() => store.fetchMonthOverview());
 
 // ── Calendar helpers ──────────────────────────────────────────────────────────
-
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
 
 const DAY_HEADERS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -77,7 +63,7 @@ function signalsFor(dateISO: string): DaySignals | null {
 
 function hasAnySignal(s: DaySignals | null): boolean {
   if (!s) return false;
-  return s.has_journal || s.has_transactions || s.has_completed_tasks || s.has_time_entries;
+  return s.has_journal || s.has_transactions || s.has_completed_tasks || s.has_time_entries || s.has_health_log;
 }
 </script>
 
@@ -187,6 +173,11 @@ function hasAnySignal(s: DaySignals | null): boolean {
               class="w-1.5 h-1.5 rounded-full bg-blue-500"
               title="Time entries"
             />
+            <span
+              v-if="signalsFor(cell.dateISO)?.has_health_log"
+              class="w-1.5 h-1.5 rounded-full bg-green-500"
+              title="Health data"
+            />
           </div>
         </button>
       </div>
@@ -209,6 +200,10 @@ function hasAnySignal(s: DaySignals | null): boolean {
       <div class="flex items-center gap-1.5 text-xs text-parchment-600">
         <span class="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0"></span>
         Time
+      </div>
+      <div class="flex items-center gap-1.5 text-xs text-parchment-600">
+        <span class="w-2.5 h-2.5 rounded-full bg-green-500 shrink-0"></span>
+        Health
       </div>
     </div>
 

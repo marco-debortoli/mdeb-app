@@ -9,10 +9,12 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models.finance import Transaction
+from app.models.health import HealthLog
 from app.models.journal import DayRating, JournalEntry
 from app.models.task import Task, TaskStatus
 from app.models.time_tracking import TimeCategory, TimeEntry
 from app.schemas.finance import TransactionRead
+from app.schemas.health import HealthLogRead
 from app.schemas.journal import DayRatingRead, JournalEntryRead
 from app.schemas.task import TaskSummary
 from app.schemas.time_tracking import TimeEntryRead
@@ -27,6 +29,7 @@ class DaySignals(BaseModel):
     has_transactions: bool = False
     has_completed_tasks: bool = False
     has_time_entries: bool = False
+    has_health_log: bool = False
 
 
 class MonthOverviewResponse(BaseModel):
@@ -42,6 +45,7 @@ class DayProfileResponse(BaseModel):
     transactions: list[TransactionRead]
     completed_tasks: list[TaskSummary]
     time_entries: list[TimeEntryRead]
+    health_log: HealthLogRead | None
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -98,6 +102,13 @@ async def get_month_overview(
         k = str(d)
         if k in signals:
             signals[k].has_time_entries = True
+
+    # Health logs
+    result = await db.execute(select(HealthLog.date).where(in_month(HealthLog.date)))
+    for d in result.scalars():
+        k = str(d)
+        if k in signals:
+            signals[k].has_health_log = True
 
     return MonthOverviewResponse(year=year, month=month, days=signals)
 
@@ -160,6 +171,10 @@ async def get_day_profile(entry_date: date_type, db: AsyncSession = Depends(get_
     )
     time_entries = [TimeEntryRead.from_orm_with_duration(e) for e in result.scalars().all()]
 
+    # Health log
+    result = await db.execute(select(HealthLog).where(HealthLog.date == entry_date))
+    health_log = result.scalar_one_or_none()
+
     return DayProfileResponse(
         date=entry_date,
         journal=journal,
@@ -167,4 +182,5 @@ async def get_day_profile(entry_date: date_type, db: AsyncSession = Depends(get_
         transactions=transactions,
         completed_tasks=completed_tasks,
         time_entries=time_entries,
+        health_log=health_log,
     )

@@ -4,6 +4,7 @@ import EasyMDE from "easymde";
 import { marked } from "marked";
 import { useJournalStore } from "@/stores/journal";
 import MiniDatePicker from "@/components/layout/MiniDatePicker.vue";
+import { MONTH_NAMES } from "@/utils/date";
 
 // ── Date helpers ───────────────────────────────────────────────────────────────
 
@@ -26,21 +27,6 @@ function shiftDate(iso: string, days: number): string {
   d.setDate(d.getDate() + days);
   return toISODate(d);
 }
-
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
 
 function formatDateHeader(iso: string): string {
   const d = parseDate(iso);
