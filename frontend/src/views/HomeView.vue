@@ -3,6 +3,7 @@ import TasksWidget from "@/components/home/TasksWidget.vue";
 import JournalWidget from "@/components/home/JournalWidget.vue";
 import TimeWidget from "@/components/home/TimeWidget.vue";
 import FinanceWidget from "@/components/home/FinanceWidget.vue";
+import HealthWidget from "@/components/home/HealthWidget.vue";
 </script>
 
 <template>
@@ -15,6 +16,7 @@ import FinanceWidget from "@/components/home/FinanceWidget.vue";
       <JournalWidget />
       <TimeWidget />
       <FinanceWidget />
+      <HealthWidget />
     </div>
   </div>
 </template>
