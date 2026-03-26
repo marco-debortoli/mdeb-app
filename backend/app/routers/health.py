@@ -1,13 +1,14 @@
 from datetime import date as date_type
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
 from app.models.health import HealthLog
 from app.schemas.health import HealthLogRead, HealthLogUpsert, SyncRequest, SyncResponse
+from app.services.fit_import import FitImportService
 from app.services.garmin_sync import GarminSyncService
 
 router = APIRouter()
@@ -51,6 +52,56 @@ async def upsert_log(
     await db.commit()
     await db.refresh(log)
     return log
+
+
+_GARMIN_FIELDS = [
+    "steps",
+    "sleep_score",
+    "garmin_body_battery_low",
+    "garmin_body_battery_high",
+    "resting_hr",
+    "intensity_minutes_moderate",
+    "intensity_minutes_vigorous",
+    "stress_score",
+]
+
+
+@router.post("/upload-fit/{log_date}", response_model=HealthLogRead)
+async def upload_fit(
+    log_date: date_type,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if not file.filename or not file.filename.lower().endswith(".zip"):
+        raise HTTPException(status_code=400, detail="File must be a .zip archive")
+
+    zip_bytes = await file.read()
+    try:
+        data = FitImportService().parse_zip(zip_bytes)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Failed to parse ZIP: {exc}")
+
+    if not data:
+        raise HTTPException(status_code=422, detail="No recognisable health data found in ZIP")
+
+    present = {col: data[col] for col in _GARMIN_FIELDS if col in data}
+    insert_cols = ["date"] + list(present.keys()) + ["synced_at"]
+    insert_vals = [":log_date"] + [f":{k}" for k in present.keys()] + ["NOW()"]
+    set_parts = [f"{k} = :{k}" for k in present.keys()] + ["synced_at = NOW()"]
+    params: dict = {"log_date": log_date, **present}
+
+    await db.execute(
+        text(
+            f"INSERT INTO health_logs ({', '.join(insert_cols)}) "
+            f"VALUES ({', '.join(insert_vals)}) "
+            f"ON CONFLICT (date) DO UPDATE SET {', '.join(set_parts)}"
+        ),
+        params,
+    )
+    await db.commit()
+
+    result = await db.execute(select(HealthLog).where(HealthLog.date == log_date))
+    return result.scalar_one()
 
 
 @router.post("/sync", response_model=SyncResponse)

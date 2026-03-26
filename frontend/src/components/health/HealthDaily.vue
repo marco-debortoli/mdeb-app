@@ -45,6 +45,29 @@ const saveStatus = ref<"idle" | "saving" | "saved" | "error">("idle");
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
+const uploadStatus = ref<"idle" | "uploading" | "success" | "error">("idle");
+const uploadError = ref<string>("");
+
+async function handleFitUpload(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  input.value = "";
+
+  uploadStatus.value = "uploading";
+  uploadError.value = "";
+  try {
+    const updated = await healthApi.uploadFit(props.currentDate, file);
+    store.log = updated;
+    syncLocalFromStore();
+    uploadStatus.value = "success";
+    setTimeout(() => (uploadStatus.value = "idle"), 3000);
+  } catch (e: any) {
+    uploadStatus.value = "error";
+    uploadError.value = e.message ?? "Upload failed";
+  }
+}
+
 const hoverRating = ref(0);
 
 // ── Data loading ───────────────────────────────────────────────────────────────
@@ -171,8 +194,36 @@ onBeforeUnmount(() => {
   </div>
 
   <template v-else>
-    <!-- ── Save status ──────────────────────────────────────────────────────── -->
-    <div class="flex justify-end mb-3 h-4">
+    <!-- ── Save status / upload row ────────────────────────────────────────── -->
+    <div class="flex items-center justify-between mb-3 min-h-6">
+      <!-- Left: FIT upload -->
+      <label
+        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer transition-colors border"
+        :class="uploadStatus === 'uploading'
+          ? 'bg-parchment-200 border-parchment-300 text-slate-400 cursor-not-allowed pointer-events-none'
+          : uploadStatus === 'error'
+            ? 'bg-red-50 border-red-200 text-red-500'
+            : uploadStatus === 'success'
+              ? 'bg-forest-50 border-forest-200 text-forest-700'
+              : 'bg-parchment-100 border-parchment-300 text-slate-600 hover:bg-parchment-200'"
+      >
+        <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+        </svg>
+        <span v-if="uploadStatus === 'uploading'">Uploading…</span>
+        <span v-else-if="uploadStatus === 'success'">Imported</span>
+        <span v-else-if="uploadStatus === 'error'">{{ uploadError }}</span>
+        <span v-else>Import FIT ZIP</span>
+        <input
+          type="file"
+          accept=".zip"
+          class="sr-only"
+          :disabled="uploadStatus === 'uploading'"
+          @change="handleFitUpload"
+        />
+      </label>
+
+      <!-- Right: auto-save status -->
       <span
         class="text-xs transition-opacity"
         :class="{

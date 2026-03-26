@@ -34,4 +34,15 @@ export const healthApi = {
       method: "POST",
       body: JSON.stringify({ start_date: startDate ?? null, end_date: endDate ?? null }),
     }),
+
+  uploadFit: async (date: string, file: File): Promise<HealthLog> => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${BASE}/upload-fit/${date}`, { method: "POST", body: form });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`${res.status} ${res.statusText}: ${text}`);
+    }
+    return res.json();
+  },
 };
