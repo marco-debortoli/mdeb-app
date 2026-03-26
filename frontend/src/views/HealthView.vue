@@ -74,7 +74,7 @@ const selectedRange = ref<RangeLabel>("30d");
 <template>
   <div class="max-w-3xl mx-auto" @click.self="showDatePicker = false">
     <!-- ── Header ──────────────────────────────────────────────────────────── -->
-    <div class="flex items-center gap-2 mb-6">
+    <div class="flex items-center gap-2 mb-6 flex-wrap">
 
       <!-- Left: date nav (daily) or range selector (overview) -->
       <template v-if="activeView === 'daily'">
@@ -91,7 +91,7 @@ const selectedRange = ref<RangeLabel>("30d");
 
           <div class="relative">
             <button
-              class="px-3 py-1.5 rounded-lg text-xl font-semibold text-slate-800 hover:bg-parchment-200 transition-colors leading-tight"
+              class="px-2 py-1.5 rounded-lg text-sm sm:text-xl font-semibold text-slate-800 hover:bg-parchment-200 transition-colors leading-tight"
               @click.stop="showDatePicker = !showDatePicker"
             >
               {{ formatDateHeader(currentDate) }}

@@ -240,7 +240,7 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- ── Unified metrics grid ───────────────────────────────────────────── -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
 
       <!-- Steps -->
       <div class="bg-parchment-50 border border-parchment-300 rounded-xl px-4 py-3">
