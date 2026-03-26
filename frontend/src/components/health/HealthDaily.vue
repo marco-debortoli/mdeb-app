@@ -1,6 +1,17 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useHealthStore } from "@/stores/health";
+import { healthApi } from "@/api/health";
+
+const KG_PER_LB = 0.45359237;
+
+function kgToLbs(kg: number): number {
+  return Math.round((kg / KG_PER_LB) * 10) / 10;
+}
+
+function lbsToKg(lbs: number): number {
+  return Math.round(lbs * KG_PER_LB * 100) / 100;
+}
 
 const props = defineProps<{ currentDate: string }>();
 
@@ -17,7 +28,8 @@ const localStressScore = ref<string>("");
 const localIntensityMod = ref<string>("");
 const localIntensityVig = ref<string>("");
 const localEnergyRating = ref<number>(0);
-const localWeightKg = ref<string>("");
+const localWeightLbs = ref<string>("");
+const lastWeightLbs = ref<number | null>(null);
 
 const localSleepRating = computed(() => {
   const n = parseInt(localSleepScore.value);
@@ -52,12 +64,28 @@ function syncLocalFromStore() {
   localIntensityMod.value = numToStr(l?.intensity_minutes_moderate);
   localIntensityVig.value = numToStr(l?.intensity_minutes_vigorous);
   localEnergyRating.value = l?.energy_rating ?? 0;
-  localWeightKg.value = numToStr(l?.weight_kg);
+  localWeightLbs.value = l?.weight_kg != null ? String(kgToLbs(l.weight_kg)) : "";
 }
 
 async function loadDate(date: string) {
   await store.fetchLog(date);
   syncLocalFromStore();
+  lastWeightLbs.value = await fetchLastWeight(date);
+}
+
+async function fetchLastWeight(date: string): Promise<number | null> {
+  const d = new Date(date + "T00:00:00");
+  d.setDate(d.getDate() - 1);
+  const end = d.toISOString().slice(0, 10);
+  d.setDate(d.getDate() - 89);
+  const start = d.toISOString().slice(0, 10);
+  try {
+    const logs = await healthApi.listLogs(start, end);
+    for (let i = logs.length - 1; i >= 0; i--) {
+      if (logs[i].weight_kg != null) return kgToLbs(logs[i].weight_kg!);
+    }
+  } catch { /* ignore */ }
+  return null;
 }
 
 watch(() => props.currentDate, loadDate, { immediate: true });
@@ -85,7 +113,7 @@ function currentPayload() {
     intensity_minutes_moderate: parseIntField(localIntensityMod.value),
     intensity_minutes_vigorous: parseIntField(localIntensityVig.value),
     energy_rating: localEnergyRating.value > 0 ? localEnergyRating.value : null,
-    weight_kg: parseFloatField(localWeightKg.value),
+    weight_kg: (() => { const lbs = parseFloatField(localWeightLbs.value); return lbs != null ? lbsToKg(lbs) : null; })(),
   };
 }
 
@@ -127,14 +155,6 @@ async function flush() {
 
 defineExpose({ flush });
 
-// ── Synced-at formatting ───────────────────────────────────────────────────────
-
-function formatSyncedAt(dt: string | null): string {
-  if (!dt) return "Not yet synced";
-  const d = new Date(dt);
-  return `Last synced: ${d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })} at ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
-}
-
 // ── Lifecycle ──────────────────────────────────────────────────────────────────
 
 onBeforeUnmount(() => {
@@ -168,39 +188,86 @@ onBeforeUnmount(() => {
       </span>
     </div>
 
-    <!-- ── Health Metrics ────────────────────────────────────────────────────── -->
-    <section class="mb-6">
-      <h2 class="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Health Metrics</h2>
+    <!-- ── Unified metrics grid ───────────────────────────────────────────── -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
 
-      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <!-- Steps -->
-        <div class="bg-parchment-50 border border-parchment-300 rounded-xl px-4 py-3">
-          <div class="flex items-center gap-2 mb-2">
-            <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
-            </svg>
-            <span class="text-xs text-slate-500">Steps</span>
-          </div>
+      <!-- Steps -->
+      <div class="bg-parchment-50 border border-parchment-300 rounded-xl px-4 py-3">
+        <div class="flex items-center gap-2 mb-2">
+          <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
+          </svg>
+          <span class="text-xs text-slate-500">Steps</span>
+        </div>
+        <input
+          v-model="localSteps"
+          type="number"
+          min="0"
+          placeholder="—"
+          class="w-full px-2 py-1 rounded-lg border border-parchment-300 bg-white text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-forest-400 focus:border-transparent"
+          @input="scheduleSave"
+        />
+      </div>
+
+      <!-- Sleep Score -->
+      <div class="bg-parchment-50 border border-parchment-300 rounded-xl px-4 py-3">
+        <div class="flex items-center gap-2 mb-2">
+          <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+          </svg>
+          <span class="text-xs text-slate-500">Sleep Score</span>
+        </div>
+        <input
+          v-model="localSleepScore"
+          type="number"
+          min="0"
+          max="100"
+          placeholder="—"
+          class="w-full px-2 py-1 rounded-lg border border-parchment-300 bg-white text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-forest-400 focus:border-transparent"
+          @input="scheduleSave"
+        />
+        <div v-if="localSleepRating != null" class="flex gap-0.5 mt-1.5">
+          <span
+            v-for="star in 5"
+            :key="star"
+            class="text-xs leading-none"
+            :class="star <= localSleepRating ? 'text-earth-400' : 'text-parchment-300'"
+          >★</span>
+        </div>
+      </div>
+
+      <!-- Resting HR -->
+      <div class="bg-parchment-50 border border-parchment-300 rounded-xl px-4 py-3">
+        <div class="flex items-center gap-2 mb-2">
+          <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+          </svg>
+          <span class="text-xs text-slate-500">Resting HR</span>
+        </div>
+        <div class="flex items-center gap-1.5">
           <input
-            v-model="localSteps"
+            v-model="localRestingHr"
             type="number"
             min="0"
             placeholder="—"
             class="w-full px-2 py-1 rounded-lg border border-parchment-300 bg-white text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-forest-400 focus:border-transparent"
             @input="scheduleSave"
           />
+          <span class="text-xs text-slate-400 shrink-0">bpm</span>
         </div>
+      </div>
 
-        <!-- Sleep Score -->
-        <div class="bg-parchment-50 border border-parchment-300 rounded-xl px-4 py-3">
-          <div class="flex items-center gap-2 mb-2">
-            <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
-            </svg>
-            <span class="text-xs text-slate-500">Sleep Score</span>
-          </div>
+      <!-- Body Battery -->
+      <div class="bg-parchment-50 border border-parchment-300 rounded-xl px-4 py-3">
+        <div class="flex items-center gap-2 mb-2">
+          <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 10.5h.375c.621 0 1.125.504 1.125 1.125v2.25c0 .621-.504 1.125-1.125 1.125H21M3.75 18h15A2.25 2.25 0 0021 15.75v-6a2.25 2.25 0 00-2.25-2.25h-15A2.25 2.25 0 001.5 9.75v6A2.25 2.25 0 003.75 18z" />
+          </svg>
+          <span class="text-xs text-slate-500">Body Battery</span>
+        </div>
+        <div class="flex items-center gap-1">
           <input
-            v-model="localSleepScore"
+            v-model="localBatteryLow"
             type="number"
             min="0"
             max="100"
@@ -208,78 +275,9 @@ onBeforeUnmount(() => {
             class="w-full px-2 py-1 rounded-lg border border-parchment-300 bg-white text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-forest-400 focus:border-transparent"
             @input="scheduleSave"
           />
-          <div v-if="localSleepRating != null" class="flex gap-0.5 mt-1.5">
-            <span
-              v-for="star in 5"
-              :key="star"
-              class="text-xs leading-none"
-              :class="star <= localSleepRating ? 'text-earth-400' : 'text-parchment-300'"
-            >★</span>
-          </div>
-        </div>
-
-        <!-- Resting HR -->
-        <div class="bg-parchment-50 border border-parchment-300 rounded-xl px-4 py-3">
-          <div class="flex items-center gap-2 mb-2">
-            <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
-            </svg>
-            <span class="text-xs text-slate-500">Resting HR</span>
-          </div>
-          <div class="flex items-center gap-1.5">
-            <input
-              v-model="localRestingHr"
-              type="number"
-              min="0"
-              placeholder="—"
-              class="w-full px-2 py-1 rounded-lg border border-parchment-300 bg-white text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-forest-400 focus:border-transparent"
-              @input="scheduleSave"
-            />
-            <span class="text-xs text-slate-400 shrink-0">bpm</span>
-          </div>
-        </div>
-
-        <!-- Body Battery -->
-        <div class="bg-parchment-50 border border-parchment-300 rounded-xl px-4 py-3">
-          <div class="flex items-center gap-2 mb-2">
-            <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M21 10.5h.375c.621 0 1.125.504 1.125 1.125v2.25c0 .621-.504 1.125-1.125 1.125H21M3.75 18h15A2.25 2.25 0 0021 15.75v-6a2.25 2.25 0 00-2.25-2.25h-15A2.25 2.25 0 001.5 9.75v6A2.25 2.25 0 003.75 18z" />
-            </svg>
-            <span class="text-xs text-slate-500">Body Battery</span>
-          </div>
-          <div class="flex items-center gap-1">
-            <input
-              v-model="localBatteryLow"
-              type="number"
-              min="0"
-              max="100"
-              placeholder="—"
-              class="w-full px-2 py-1 rounded-lg border border-parchment-300 bg-white text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-forest-400 focus:border-transparent"
-              @input="scheduleSave"
-            />
-            <span class="text-xs text-slate-400 shrink-0">→</span>
-            <input
-              v-model="localBatteryHigh"
-              type="number"
-              min="0"
-              max="100"
-              placeholder="—"
-              class="w-full px-2 py-1 rounded-lg border border-parchment-300 bg-white text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-forest-400 focus:border-transparent"
-              @input="scheduleSave"
-            />
-          </div>
-        </div>
-
-        <!-- Stress -->
-        <div class="bg-parchment-50 border border-parchment-300 rounded-xl px-4 py-3">
-          <div class="flex items-center gap-2 mb-2">
-            <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-            </svg>
-            <span class="text-xs text-slate-500">Stress</span>
-          </div>
+          <span class="text-xs text-slate-400 shrink-0">→</span>
           <input
-            v-model="localStressScore"
+            v-model="localBatteryHigh"
             type="number"
             min="0"
             max="100"
@@ -288,84 +286,109 @@ onBeforeUnmount(() => {
             @input="scheduleSave"
           />
         </div>
+      </div>
 
-        <!-- Intensity Minutes -->
-        <div class="bg-parchment-50 border border-parchment-300 rounded-xl px-4 py-3">
-          <div class="flex items-center gap-2 mb-2">
-            <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6" />
-            </svg>
-            <span class="text-xs text-slate-500">Intensity Min</span>
-          </div>
-          <div class="flex items-center gap-1">
-            <input
-              v-model="localIntensityMod"
-              type="number"
-              min="0"
-              placeholder="—"
-              class="w-full px-2 py-1 rounded-lg border border-parchment-300 bg-white text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-forest-400 focus:border-transparent"
-              @input="scheduleSave"
-            />
-            <span class="text-xs text-slate-400 shrink-0">/</span>
-            <input
-              v-model="localIntensityVig"
-              type="number"
-              min="0"
-              placeholder="—"
-              class="w-full px-2 py-1 rounded-lg border border-parchment-300 bg-white text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-forest-400 focus:border-transparent"
-              @input="scheduleSave"
-            />
-          </div>
-          <p class="text-xs text-slate-400 mt-1">mod / vig</p>
+      <!-- Stress -->
+      <div class="bg-parchment-50 border border-parchment-300 rounded-xl px-4 py-3">
+        <div class="flex items-center gap-2 mb-2">
+          <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+          </svg>
+          <span class="text-xs text-slate-500">Stress</span>
+        </div>
+        <input
+          v-model="localStressScore"
+          type="number"
+          min="0"
+          max="100"
+          placeholder="—"
+          class="w-full px-2 py-1 rounded-lg border border-parchment-300 bg-white text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-forest-400 focus:border-transparent"
+          @input="scheduleSave"
+        />
+      </div>
+
+      <!-- Intensity Minutes -->
+      <div class="bg-parchment-50 border border-parchment-300 rounded-xl px-4 py-3">
+        <div class="flex items-center gap-2 mb-2">
+          <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6" />
+          </svg>
+          <span class="text-xs text-slate-500">Intensity Min</span>
+        </div>
+        <div class="flex items-center gap-1">
+          <input
+            v-model="localIntensityMod"
+            type="number"
+            min="0"
+            placeholder="—"
+            class="w-full px-2 py-1 rounded-lg border border-parchment-300 bg-white text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-forest-400 focus:border-transparent"
+            @input="scheduleSave"
+          />
+          <span class="text-xs text-slate-400 shrink-0">/</span>
+          <input
+            v-model="localIntensityVig"
+            type="number"
+            min="0"
+            placeholder="—"
+            class="w-full px-2 py-1 rounded-lg border border-parchment-300 bg-white text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-forest-400 focus:border-transparent"
+            @input="scheduleSave"
+          />
+        </div>
+        <p class="text-xs text-slate-400 mt-1">mod / vig</p>
+      </div>
+
+      <!-- Energy Rating -->
+      <div class="bg-parchment-50 border border-parchment-300 rounded-xl px-4 py-3">
+        <div class="flex items-center gap-2 mb-2">
+          <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+          </svg>
+          <span class="text-xs text-slate-500">Energy</span>
+        </div>
+        <div class="flex items-center gap-0.5 mt-1" @mouseleave="hoverRating = 0">
+          <button
+            v-for="star in 5"
+            :key="star"
+            class="text-xl leading-none transition-colors p-0.5"
+            :class="star <= (hoverRating || localEnergyRating) ? 'text-earth-400' : 'text-parchment-300'"
+            :title="`Energy: ${star} star${star !== 1 ? 's' : ''}`"
+            @mouseenter="hoverRating = star"
+            @click="setEnergyRating(star)"
+          >
+            ★
+          </button>
         </div>
       </div>
 
-      <!-- Synced at -->
-      <p class="mt-3 text-xs text-slate-400">
-        {{ formatSyncedAt(store.log?.synced_at ?? null) }}
-      </p>
-    </section>
-
-    <!-- ── Manual Entries ──────────────────────────────────────────────────── -->
-    <section>
-      <h2 class="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Manual Entries</h2>
-
-      <div class="bg-parchment-50 border border-parchment-300 rounded-xl px-5 py-4 space-y-5">
-        <!-- Energy rating -->
-        <div>
-          <label class="block text-sm font-medium text-slate-700 mb-2">Energy Rating</label>
-          <div class="flex items-center gap-0.5" @mouseleave="hoverRating = 0">
-            <button
-              v-for="star in 5"
-              :key="star"
-              class="text-2xl leading-none transition-colors p-0.5"
-              :class="star <= (hoverRating || localEnergyRating) ? 'text-earth-400' : 'text-parchment-300'"
-              :title="`Energy: ${star} star${star !== 1 ? 's' : ''}`"
-              @mouseenter="hoverRating = star"
-              @click="setEnergyRating(star)"
-            >
-              ★
-            </button>
-          </div>
+      <!-- Weight -->
+      <div class="bg-parchment-50 border border-parchment-300 rounded-xl px-4 py-3">
+        <div class="flex items-center gap-2 mb-2">
+          <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75M18.75 4.97A48.416 48.416 0 0012 4.5c-2.291 0-4.545.16-6.75.47m13.5 0c1.01.143 2.01.317 3 .52m-3-.52l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 01-2.031.352 5.988 5.988 0 01-2.031-.352c-.483-.174-.711-.703-.59-1.202L18.75 4.97zm-16.5.52c.99-.203 1.99-.377 3-.52m0 0l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.989 5.989 0 01-2.031.352 5.989 5.989 0 01-2.031-.352c-.483-.174-.711-.703-.59-1.202L5.25 4.97z" />
+          </svg>
+          <span class="text-xs text-slate-500">Weight</span>
         </div>
-
-        <!-- Weight -->
-        <div>
-          <label class="block text-sm font-medium text-slate-700 mb-2">Weight</label>
-          <div class="flex items-center gap-2">
-            <input
-              v-model="localWeightKg"
-              type="number"
-              step="0.1"
-              min="0"
-              placeholder="—"
-              class="w-28 px-3 py-1.5 rounded-lg border border-parchment-300 bg-white text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-forest-400 focus:border-transparent"
-              @input="scheduleSave"
-            />
-            <span class="text-sm text-slate-500">kg</span>
-          </div>
+        <div class="flex items-center gap-1.5">
+          <input
+            v-model="localWeightLbs"
+            type="number"
+            step="0.1"
+            min="0"
+            placeholder="—"
+            class="w-full px-2 py-1 rounded-lg border border-parchment-300 bg-white text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-forest-400 focus:border-transparent"
+            @input="scheduleSave"
+          />
+          <span class="text-xs text-slate-400 shrink-0">lbs</span>
         </div>
+        <button
+          v-if="lastWeightLbs !== null"
+          class="mt-1.5 text-xs text-slate-400 hover:text-slate-600 transition-colors text-left"
+          @click="localWeightLbs = String(lastWeightLbs); scheduleSave()"
+        >
+          Use last: {{ lastWeightLbs }} lbs
+        </button>
       </div>
-    </section>
+
+    </div>
   </template>
 </template>
