@@ -20,7 +20,10 @@ export function useDayEntries(date: Ref<string> | string) {
   return computed((): DayEntries | undefined => {
     const d = isRef(date) ? date.value : date;
     const dayData = store.days.find((day) => day.date === d);
-    const prevDayData = store.days.find((day) => day.date === prevDateISO(d));
+    const prevISO = prevDateISO(d);
+    const prevDayData =
+      store.days.find((day) => day.date === prevISO) ??
+      (store.prevMonthLastDay?.date === prevISO ? store.prevMonthLastDay : undefined);
 
     const overnight = (prevDayData?.entries ?? []).filter(
       (e) => e.end_time.split("T")[0] === d,

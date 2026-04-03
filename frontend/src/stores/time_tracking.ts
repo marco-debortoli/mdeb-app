@@ -18,6 +18,7 @@ import type {
 export const useTimeStore = defineStore("time", () => {
   // ── State ───────────────────────────────────────────────────────────────────
   const days = ref<DayEntries[]>([]);
+  const prevMonthLastDay = ref<DayEntries | null>(null);
   const categories = ref<TimeCategory[]>([]);
   const summary = ref<CategorySummary[]>([]);
   const grandTotalMinutes = ref(0);
@@ -32,8 +33,14 @@ export const useTimeStore = defineStore("time", () => {
   }
 
   async function fetchEntries() {
-    const res = await timeEntryApi.list(currentMonth.value);
+    const [res, prevRes] = await Promise.all([
+      timeEntryApi.list(currentMonth.value),
+      timeEntryApi.list(shiftMonth(currentMonth.value, -1)),
+    ]);
     days.value = res.days;
+    // Cache the last calendar day of the previous month so useDayEntries can
+    // detect overnight entries that cross the month boundary (e.g. Mar 31 → Apr 1).
+    prevMonthLastDay.value = prevRes.days[prevRes.days.length - 1] ?? null;
   }
 
   async function fetchSummary() {
@@ -122,6 +129,7 @@ export const useTimeStore = defineStore("time", () => {
 
   return {
     days,
+    prevMonthLastDay,
     categories,
     summary,
     grandTotalMinutes,
