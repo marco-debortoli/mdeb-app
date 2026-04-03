@@ -2,7 +2,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
-from app.models.task import EffortLevel, Priority, TaskStatus
+from app.tasks.models import EffortLevel, Priority, TaskStatus
 
 
 # ── Category ──────────────────────────────────────────────────────────────────

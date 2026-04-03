@@ -4,21 +4,24 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import extract, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
-from app.models.journal import JournalEntry
-from app.schemas.journal import JournalEntryRead, JournalEntryUpsert
+from app.core.database import get_db
+from app.journal.models import DayRating, JournalEntry
+from app.journal.schemas import DayRatingRead, DayRatingUpsert, JournalEntryRead, JournalEntryUpsert
 
-router = APIRouter()
+journal_router = APIRouter()
+day_ratings_router = APIRouter()
 
 
-@router.get("/dates", response_model=list[str])
+# ── Journal Entries ───────────────────────────────────────────────────────────
+
+@journal_router.get("/dates", response_model=list[str])
 async def list_entry_dates(db: AsyncSession = Depends(get_db)):
     """Return ISO date strings for all days that have a journal entry."""
     result = await db.execute(select(JournalEntry.date).order_by(JournalEntry.date))
     return [str(d) for d in result.scalars().all()]
 
 
-@router.get("/on-this-day", response_model=list[JournalEntryRead])
+@journal_router.get("/on-this-day", response_model=list[JournalEntryRead])
 async def on_this_day(
     month: int = Query(..., ge=1, le=12),
     day: int = Query(..., ge=1, le=31),
@@ -37,7 +40,7 @@ async def on_this_day(
     return result.scalars().all()
 
 
-@router.get("/{entry_date}", response_model=JournalEntryRead)
+@journal_router.get("/{entry_date}", response_model=JournalEntryRead)
 async def get_entry(entry_date: date_type, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(JournalEntry).where(JournalEntry.date == entry_date)
@@ -48,7 +51,7 @@ async def get_entry(entry_date: date_type, db: AsyncSession = Depends(get_db)):
     return entry
 
 
-@router.put("/{entry_date}", response_model=JournalEntryRead)
+@journal_router.put("/{entry_date}", response_model=JournalEntryRead)
 async def upsert_entry(
     entry_date: date_type, body: JournalEntryUpsert, db: AsyncSession = Depends(get_db)
 ):
@@ -64,3 +67,34 @@ async def upsert_entry(
     await db.commit()
     await db.refresh(entry)
     return entry
+
+
+# ── Day Ratings ───────────────────────────────────────────────────────────────
+
+@day_ratings_router.get("/{rating_date}", response_model=DayRatingRead)
+async def get_rating(rating_date: date_type, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(DayRating).where(DayRating.date == rating_date)
+    )
+    rating = result.scalar_one_or_none()
+    if not rating:
+        raise HTTPException(status_code=404, detail="No rating for this date")
+    return rating
+
+
+@day_ratings_router.put("/{rating_date}", response_model=DayRatingRead)
+async def upsert_rating(
+    rating_date: date_type, body: DayRatingUpsert, db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(
+        select(DayRating).where(DayRating.date == rating_date)
+    )
+    rating = result.scalar_one_or_none()
+    if rating is None:
+        rating = DayRating(date=rating_date, rating=body.rating)
+        db.add(rating)
+    else:
+        rating.rating = body.rating
+    await db.commit()
+    await db.refresh(rating)
+    return rating

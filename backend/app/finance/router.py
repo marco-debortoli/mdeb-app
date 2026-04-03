@@ -5,11 +5,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.database import get_db
-from app.models.finance import (
+from app.core.database import get_db
+from app.finance.models import (
     AccountValue, FinanceAccount, FinanceCategory, FinanceCategoryType, Merchant, Transaction,
 )
-from app.schemas.finance import (
+from app.finance.schemas import (
     AccountCreate, AccountMonthlySummary, AccountRead, AccountUpdate, AccountValueRead,
     AccountValueUpsert, CategoriesByType, CategoryMonthlySummary, FinanceCategoryCreate,
     FinanceCategoryRead, FinanceCategoryUpdate, MerchantCreate, MerchantRead, MerchantUpdate,

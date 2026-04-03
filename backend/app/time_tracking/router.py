@@ -6,9 +6,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.database import get_db
-from app.models.time_tracking import TimeCategory, TimeEntry, TimeSubcategory
-from app.schemas.time_tracking import (
+from app.core.database import get_db
+from app.time_tracking.models import TimeCategory, TimeEntry, TimeSubcategory
+from app.time_tracking.schemas import (
     CategorySummary,
     DayEntries,
     MonthEntriesResponse,

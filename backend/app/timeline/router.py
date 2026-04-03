@@ -2,53 +2,21 @@ import calendar
 from datetime import date as date_type, timedelta
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
 from sqlalchemy import Date, and_, cast, extract, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.database import get_db
-from app.models.finance import Transaction
-from app.models.health import HealthLog
-from app.models.journal import DayRating, JournalEntry
-from app.models.task import Task, TaskStatus
-from app.models.time_tracking import TimeCategory, TimeEntry
-from app.schemas.finance import TransactionRead
-from app.schemas.health import HealthLogRead
-from app.schemas.journal import DayRatingRead, JournalEntryRead
-from app.schemas.task import TaskSummary
-from app.schemas.time_tracking import TimeEntryRead
+from app.core.database import get_db
+from app.finance.models import Transaction
+from app.health.models import HealthLog
+from app.journal.models import DayRating, JournalEntry
+from app.tasks.models import Task, TaskStatus
+from app.time_tracking.models import TimeCategory, TimeEntry
+from app.time_tracking.schemas import TimeEntryRead
+from app.timeline.schemas import DayProfileResponse, DaySignals, MonthOverviewResponse
 
 router = APIRouter()
 
-
-# ── Schemas ───────────────────────────────────────────────────────────────────
-
-class DaySignals(BaseModel):
-    has_journal: bool = False
-    has_transactions: bool = False
-    has_completed_tasks: bool = False
-    has_time_entries: bool = False
-    has_health_log: bool = False
-
-
-class MonthOverviewResponse(BaseModel):
-    year: int
-    month: int
-    days: dict[str, DaySignals]
-
-
-class DayProfileResponse(BaseModel):
-    date: date_type
-    journal: JournalEntryRead | None
-    rating: DayRatingRead | None
-    transactions: list[TransactionRead]
-    completed_tasks: list[TaskSummary]
-    time_entries: list[TimeEntryRead]
-    health_log: HealthLogRead | None
-
-
-# ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.get("/month-overview", response_model=MonthOverviewResponse)
 async def get_month_overview(

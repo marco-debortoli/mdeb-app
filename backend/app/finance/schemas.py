@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
-from app.models.finance import AccountType, FinanceCategoryType
+from app.finance.models import AccountType, FinanceCategoryType
 
 
 # ── Account ───────────────────────────────────────────────────────────────────

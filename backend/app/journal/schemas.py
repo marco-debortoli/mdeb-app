@@ -19,7 +19,7 @@ class JournalEntryRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# ── Day Rating ─────────────────────────────────────────────────────────────────
+# ── Day Rating ────────────────────────────────────────────────────────────────
 
 class DayRatingUpsert(BaseModel):
     rating: int = Field(..., ge=1, le=5)

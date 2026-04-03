@@ -4,12 +4,11 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
-from app.database import get_db
-from app.models.health import HealthLog
-from app.schemas.health import HealthLogRead, HealthLogUpsert, SyncRequest, SyncResponse
-from app.services.fit_import import FitImportService
-from app.services.garmin_sync import GarminSyncService
+from app.core.config import settings
+from app.core.database import get_db
+from app.health.models import HealthLog
+from app.health.schemas import HealthLogRead, HealthLogUpsert, SyncRequest, SyncResponse
+from app.health.services import FitImportService, GarminSyncService
 
 router = APIRouter()
 

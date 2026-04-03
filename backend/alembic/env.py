@@ -7,8 +7,16 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
-from app.config import settings
-from app.models import Base  # noqa: F401 — import all models so Alembic can detect them
+from app.core.config import settings
+from app.core.database import Base
+
+# Import all model modules so Alembic can detect table metadata for autogenerate.
+import app.tasks.models        # noqa: F401
+import app.journal.models      # noqa: F401
+import app.finance.models      # noqa: F401
+import app.time_tracking.models  # noqa: F401
+import app.notes.models        # noqa: F401
+import app.health.models       # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
