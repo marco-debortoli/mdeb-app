@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 import { useTimeStore } from "@/stores/time_tracking";
 import type { TimeEntry } from "@/types/time_tracking";
 
@@ -141,13 +141,17 @@ function resetForm(date?: string) {
   applyStartPrefill(d);
 }
 
-function populateFromEntry(entry: TimeEntry) {
+async function populateFromEntry(entry: TimeEntry) {
   form.value = {
     date: entry.date,
     time_category_id: entry.time_category_id,
     time_subcategory_id: entry.time_subcategory_id,
     notes: entry.notes ?? "",
   };
+  // The category watcher fires asynchronously and clears time_subcategory_id.
+  // Wait for it to run, then restore the original subcategory.
+  await nextTick();
+  form.value.time_subcategory_id = entry.time_subcategory_id;
   error.value = null;
   overlapWarning.value = false;
 
