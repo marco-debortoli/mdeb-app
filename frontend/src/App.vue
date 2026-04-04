@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import AppSidebar from "@/components/layout/AppSidebar.vue";
-import AppHeader from "@/components/layout/AppHeader.vue";
+import AppSidebar from "@/shared/components/AppSidebar.vue";
+import AppHeader from "@/shared/components/AppHeader.vue";
 import { useRoute } from "vue-router";
 import { ref } from "vue";
 

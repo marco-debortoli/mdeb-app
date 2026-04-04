@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import TasksWidget from "@/components/home/TasksWidget.vue";
-import JournalWidget from "@/components/home/JournalWidget.vue";
-import TimeWidget from "@/components/home/TimeWidget.vue";
-import FinanceWidget from "@/components/home/FinanceWidget.vue";
-import HealthWidget from "@/components/home/HealthWidget.vue";
+import TasksWidget from "@/modules/tasks/TasksWidget.vue";
+import JournalWidget from "@/modules/journal/JournalWidget.vue";
+import TimeWidget from "@/modules/time_tracking/TimeWidget.vue";
+import FinanceWidget from "@/modules/finance/FinanceWidget.vue";
+import HealthWidget from "@/modules/health/HealthWidget.vue";
 </script>
 
 <template>
