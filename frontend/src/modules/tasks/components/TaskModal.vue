@@ -4,6 +4,7 @@ import { EffortLevel, Priority, TaskStatus } from "@/modules/tasks/types";
 import type { Task, TaskSummary } from "@/modules/tasks/types";
 import { taskApi } from "@/modules/tasks/api";
 import { useTasksStore } from "@/modules/tasks/store";
+import BaseModal from "@/shared/components/BaseModal.vue";
 
 const props = defineProps<{
   open: boolean;
@@ -157,233 +158,194 @@ function formatNoteDate(d: string): string {
 </script>
 
 <template>
-  <Teleport to="body">
-    <Transition name="modal">
-      <div
-        v-if="open"
-        class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
-        @click.self="emit('close')"
-      >
-        <!-- Backdrop -->
-        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="emit('close')" />
+  <BaseModal
+    :open="open"
+    :title="modalTitle"
+    :mobile="true"
+    max-width="sm:max-w-lg"
+    height-class="max-h-[92vh] sm:max-h-[90vh]"
+    @close="emit('close')"
+  >
+    <!-- Error -->
+    <p v-if="error" class="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{{ error }}</p>
 
-        <!-- Panel -->
-        <div
-          class="relative w-full sm:max-w-lg bg-parchment-50 rounded-t-xl sm:rounded-xl shadow-2xl border border-parchment-300 flex flex-col max-h-[92vh] sm:max-h-[90vh]"
+    <!-- Title -->
+    <div>
+      <label class="block text-xs font-medium text-slate-600 mb-1">Title</label>
+      <input
+        v-model="title"
+        type="text"
+        placeholder="Task title"
+        class="w-full text-sm rounded-lg border border-parchment-300 bg-white px-3 py-2 text-slate-800 placeholder-slate-400 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none"
+        @keydown.enter="save"
+      />
+    </div>
+
+    <!-- Status + Priority + Effort -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Status</label>
+        <select
+          v-model="statusVal"
+          class="w-full text-sm rounded-lg border border-parchment-300 bg-white px-3 py-2 text-slate-800 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none"
         >
-          <!-- Header -->
-          <div class="flex items-center justify-between px-5 py-4 border-b border-parchment-300 shrink-0">
-            <h2 class="text-base font-semibold text-slate-800">{{ modalTitle }}</h2>
+          <option :value="TaskStatus.TODO">To Do</option>
+          <option :value="TaskStatus.IN_PROGRESS">In Progress</option>
+          <option :value="TaskStatus.WAITING">Waiting</option>
+          <option :value="TaskStatus.COMPLETE">Complete</option>
+          <option :value="TaskStatus.BACKLOG">Backlog</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Priority</label>
+        <select
+          v-model="priorityVal"
+          class="w-full text-sm rounded-lg border border-parchment-300 bg-white px-3 py-2 text-slate-800 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none"
+        >
+          <option value="">— None</option>
+          <option :value="Priority.LOW">Low</option>
+          <option :value="Priority.MEDIUM">Medium</option>
+          <option :value="Priority.HIGH">High</option>
+          <option :value="Priority.URGENT">Urgent</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Effort</label>
+        <select
+          v-model="effort"
+          class="w-full text-sm rounded-lg border border-parchment-300 bg-white px-3 py-2 text-slate-800 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none"
+        >
+          <option value="">— None</option>
+          <option :value="EffortLevel.LOW">Low</option>
+          <option :value="EffortLevel.MEDIUM">Medium</option>
+          <option :value="EffortLevel.HIGH">High</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Category + Project -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Category</label>
+        <select
+          v-model="categoryId"
+          class="w-full text-sm rounded-lg border border-parchment-300 bg-white px-3 py-2 text-slate-800 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none"
+        >
+          <option value="">— None</option>
+          <option v-for="cat in store.categories" :key="cat.id" :value="cat.id">
+            {{ cat.name }}
+          </option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Project</label>
+        <select
+          v-model="projectId"
+          class="w-full text-sm rounded-lg border border-parchment-300 bg-white px-3 py-2 text-slate-800 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none"
+        >
+          <option value="">— None</option>
+          <option v-for="proj in store.projects" :key="proj.id" :value="proj.id">
+            {{ proj.name }}
+          </option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Scheduled date + Completed date -->
+    <div class="flex gap-3">
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Scheduled date</label>
+        <input
+          v-model="scheduledDate"
+          type="date"
+          class="text-sm rounded-lg border border-parchment-300 bg-white px-3 py-2 text-slate-800 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none"
+        />
+      </div>
+      <div v-if="statusVal === TaskStatus.COMPLETE">
+        <label class="block text-xs font-medium text-slate-600 mb-1">Completed date</label>
+        <input
+          v-model="completedDate"
+          type="date"
+          class="text-sm rounded-lg border border-parchment-300 bg-white px-3 py-2 text-slate-800 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none"
+        />
+      </div>
+    </div>
+
+    <!-- Notes section (edit mode only) -->
+    <div v-if="isEdit" class="border-t border-parchment-200 pt-4">
+      <h3 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">Notes</h3>
+
+      <div v-if="notesLoading" class="text-xs text-slate-400 py-2">Loading notes…</div>
+      <div v-else>
+        <div v-if="fullTask && fullTask.notes.length" class="space-y-2 mb-3">
+          <div
+            v-for="note in fullTask.notes"
+            :key="note.id"
+            class="flex items-start gap-2 bg-parchment-100 rounded-lg px-3 py-2"
+          >
+            <div class="flex-1 min-w-0">
+              <p class="text-xs font-mono text-slate-400 mb-0.5">{{ formatNoteDate(note.created_at) }}</p>
+              <p class="text-sm text-slate-700 whitespace-pre-wrap break-words">{{ note.content }}</p>
+            </div>
             <button
-              class="p-1 rounded-lg text-slate-400 hover:bg-parchment-200 hover:text-slate-600 transition-colors"
-              @click="emit('close')"
+              class="shrink-0 p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+              title="Delete note"
+              @click="deleteNote(note.id)"
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
+        </div>
+        <p v-else class="text-xs text-slate-400 mb-3">No notes yet.</p>
 
-          <!-- Body -->
-          <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-            <!-- Error -->
-            <p v-if="error" class="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{{ error }}</p>
-
-            <!-- Title -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Title</label>
-              <input
-                v-model="title"
-                type="text"
-                placeholder="Task title"
-                class="w-full text-sm rounded-lg border border-parchment-300 bg-white px-3 py-2 text-slate-800 placeholder-slate-400 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none"
-                @keydown.enter="save"
-              />
-            </div>
-
-            <!-- Status + Priority + Effort -->
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Status</label>
-                <select
-                  v-model="statusVal"
-                  class="w-full text-sm rounded-lg border border-parchment-300 bg-white px-3 py-2 text-slate-800 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none"
-                >
-                  <option :value="TaskStatus.TODO">To Do</option>
-                  <option :value="TaskStatus.IN_PROGRESS">In Progress</option>
-                  <option :value="TaskStatus.WAITING">Waiting</option>
-                  <option :value="TaskStatus.COMPLETE">Complete</option>
-                  <option :value="TaskStatus.BACKLOG">Backlog</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Priority</label>
-                <select
-                  v-model="priorityVal"
-                  class="w-full text-sm rounded-lg border border-parchment-300 bg-white px-3 py-2 text-slate-800 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none"
-                >
-                  <option value="">— None</option>
-                  <option :value="Priority.LOW">Low</option>
-                  <option :value="Priority.MEDIUM">Medium</option>
-                  <option :value="Priority.HIGH">High</option>
-                  <option :value="Priority.URGENT">Urgent</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Effort</label>
-                <select
-                  v-model="effort"
-                  class="w-full text-sm rounded-lg border border-parchment-300 bg-white px-3 py-2 text-slate-800 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none"
-                >
-                  <option value="">— None</option>
-                  <option :value="EffortLevel.LOW">Low</option>
-                  <option :value="EffortLevel.MEDIUM">Medium</option>
-                  <option :value="EffortLevel.HIGH">High</option>
-                </select>
-              </div>
-            </div>
-
-            <!-- Category + Project -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Category</label>
-                <select
-                  v-model="categoryId"
-                  class="w-full text-sm rounded-lg border border-parchment-300 bg-white px-3 py-2 text-slate-800 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none"
-                >
-                  <option value="">— None</option>
-                  <option v-for="cat in store.categories" :key="cat.id" :value="cat.id">
-                    {{ cat.name }}
-                  </option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Project</label>
-                <select
-                  v-model="projectId"
-                  class="w-full text-sm rounded-lg border border-parchment-300 bg-white px-3 py-2 text-slate-800 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none"
-                >
-                  <option value="">— None</option>
-                  <option v-for="proj in store.projects" :key="proj.id" :value="proj.id">
-                    {{ proj.name }}
-                  </option>
-                </select>
-              </div>
-            </div>
-
-            <!-- Scheduled date + Completed date -->
-            <div class="flex gap-3">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Scheduled date</label>
-                <input
-                  v-model="scheduledDate"
-                  type="date"
-                  class="text-sm rounded-lg border border-parchment-300 bg-white px-3 py-2 text-slate-800 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none"
-                />
-              </div>
-              <div v-if="statusVal === TaskStatus.COMPLETE">
-                <label class="block text-xs font-medium text-slate-600 mb-1">Completed date</label>
-                <input
-                  v-model="completedDate"
-                  type="date"
-                  class="text-sm rounded-lg border border-parchment-300 bg-white px-3 py-2 text-slate-800 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none"
-                />
-              </div>
-            </div>
-
-            <!-- Notes section (edit mode only) -->
-            <div v-if="isEdit" class="border-t border-parchment-200 pt-4">
-              <h3 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">Notes</h3>
-
-              <div v-if="notesLoading" class="text-xs text-slate-400 py-2">Loading notes…</div>
-              <div v-else>
-                <div v-if="fullTask && fullTask.notes.length" class="space-y-2 mb-3">
-                  <div
-                    v-for="note in fullTask.notes"
-                    :key="note.id"
-                    class="flex items-start gap-2 bg-parchment-100 rounded-lg px-3 py-2"
-                  >
-                    <div class="flex-1 min-w-0">
-                      <p class="text-xs font-mono text-slate-400 mb-0.5">{{ formatNoteDate(note.created_at) }}</p>
-                      <p class="text-sm text-slate-700 whitespace-pre-wrap break-words">{{ note.content }}</p>
-                    </div>
-                    <button
-                      class="shrink-0 p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-                      title="Delete note"
-                      @click="deleteNote(note.id)"
-                    >
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-                <p v-else class="text-xs text-slate-400 mb-3">No notes yet.</p>
-
-                <!-- Add note -->
-                <div class="flex gap-2">
-                  <input
-                    v-model="newNote"
-                    type="text"
-                    placeholder="Add a note…"
-                    class="flex-1 text-sm rounded-lg border border-parchment-300 bg-white px-3 py-2 text-slate-800 placeholder-slate-400 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none"
-                    @keydown.enter="addNote"
-                  />
-                  <button
-                    :disabled="!newNote.trim() || addingNote"
-                    class="px-3 py-2 rounded-lg text-sm font-medium bg-forest-600 text-parchment-50 hover:bg-forest-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    @click="addNote"
-                  >
-                    Add
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Footer -->
-          <div
-            class="flex items-center justify-between px-5 py-4 border-t border-parchment-300 shrink-0 bg-parchment-100 rounded-b-xl"
+        <!-- Add note -->
+        <div class="flex gap-2">
+          <input
+            v-model="newNote"
+            type="text"
+            placeholder="Add a note…"
+            class="flex-1 text-sm rounded-lg border border-parchment-300 bg-white px-3 py-2 text-slate-800 placeholder-slate-400 focus:border-forest-500 focus:ring-1 focus:ring-forest-500 outline-none"
+            @keydown.enter="addNote"
+          />
+          <button
+            :disabled="!newNote.trim() || addingNote"
+            class="px-3 py-2 rounded-lg text-sm font-medium bg-forest-600 text-parchment-50 hover:bg-forest-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            @click="addNote"
           >
-            <button
-              v-if="isEdit"
-              :disabled="deleting"
-              class="px-4 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 border border-red-200 disabled:opacity-40 transition-colors"
-              @click="confirmDelete"
-            >
-              {{ deleting ? "Deleting…" : "Delete" }}
-            </button>
-            <div v-else />
-
-            <div class="flex gap-2">
-              <button
-                class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-parchment-200 transition-colors"
-                @click="emit('close')"
-              >
-                Cancel
-              </button>
-              <button
-                :disabled="saving || !title.trim()"
-                class="px-4 py-2 rounded-lg text-sm font-medium bg-forest-600 text-parchment-50 hover:bg-forest-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                @click="save"
-              >
-                {{ saving ? "Saving…" : "Save" }}
-              </button>
-            </div>
-          </div>
+            Add
+          </button>
         </div>
       </div>
-    </Transition>
-  </Teleport>
-</template>
+    </div>
 
-<style scoped>
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 0.15s ease;
-}
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-}
-</style>
+    <template #footer-left>
+      <button
+        v-if="isEdit"
+        :disabled="deleting"
+        class="px-4 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 border border-red-200 disabled:opacity-40 transition-colors"
+        @click="confirmDelete"
+      >
+        {{ deleting ? "Deleting…" : "Delete" }}
+      </button>
+    </template>
+    <template #footer-right>
+      <div class="flex gap-2">
+        <button
+          class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-parchment-200 transition-colors"
+          @click="emit('close')"
+        >
+          Cancel
+        </button>
+        <button
+          :disabled="saving || !title.trim()"
+          class="px-4 py-2 rounded-lg text-sm font-medium bg-forest-600 text-parchment-50 hover:bg-forest-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          @click="save"
+        >
+          {{ saving ? "Saving…" : "Save" }}
+        </button>
+      </div>
+    </template>
+  </BaseModal>
+</template>

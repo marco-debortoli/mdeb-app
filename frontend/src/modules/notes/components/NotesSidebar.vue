@@ -198,7 +198,7 @@ async function handleNewNote() {
 
   <!-- Folder modal -->
   <NoteFolderModal
-    :show="folderModalShow"
+    :open="folderModalShow"
     :mode="folderModalMode"
     :folder="folderModalTarget"
     :parent-folder="folderModalParent"
