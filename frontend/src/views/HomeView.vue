@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import TasksWidget from "@/modules/tasks/TasksWidget.vue";
-import JournalWidget from "@/modules/journal/JournalWidget.vue";
-import TimeWidget from "@/modules/time_tracking/TimeWidget.vue";
-import FinanceWidget from "@/modules/finance/FinanceWidget.vue";
-import HealthWidget from "@/modules/health/HealthWidget.vue";
+import TasksHomeWidget from "@/modules/tasks/widgets/TasksHomeWidget.vue";
+import JournalHomeWidget from "@/modules/journal/widgets/JournalHomeWidget.vue";
+import TimeHomeWidget from "@/modules/time_tracking/widgets/TimeHomeWidget.vue";
+import FinanceHomeWidget from "@/modules/finance/widgets/FinanceHomeWidget.vue";
+import HealthHomeWidget from "@/modules/health/widgets/HealthHomeWidget.vue";
 </script>
 
 <template>
@@ -12,11 +12,11 @@ import HealthWidget from "@/modules/health/HealthWidget.vue";
       <h1 class="text-2xl font-semibold text-slate-800">Welcome, Marco DeBortoli</h1>
     </div>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch">
-      <TasksWidget />
-      <JournalWidget />
-      <TimeWidget />
-      <FinanceWidget />
-      <HealthWidget />
+      <TasksHomeWidget />
+      <JournalHomeWidget />
+      <TimeHomeWidget />
+      <FinanceHomeWidget />
+      <HealthHomeWidget />
     </div>
   </div>
 </template>
