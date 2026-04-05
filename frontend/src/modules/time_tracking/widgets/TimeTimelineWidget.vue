@@ -2,7 +2,7 @@
 import type { TimeEntry } from "@/modules/time_tracking/types";
 import { formatDuration, formatTime, isNextDay, clippedMinutesForDate } from "@/modules/time_tracking/utils";
 
-const props = defineProps<{
+defineProps<{
   entries: TimeEntry[];
   date: string;
 }>();
